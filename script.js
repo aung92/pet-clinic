@@ -11,7 +11,7 @@ function updateBangladeshTime() {
 updateBangladeshTime();
 setInterval(updateBangladeshTime, 1000);
 
-// Developer click handlers - opens email client
+// Developer click handlers
 function openEmailClient() {
   window.location.href = 'mailto:aungching.jack420@gmail.com?subject=Website%20Development%20Inquiry%20-%20VET%20FOR%20PET%20CLINIC&body=Hello%20Aung%20Ching%2C%0A%0AI%20saw%20your%20work%20on%20the%20VET%20FOR%20PET%20CLINIC%20website.%20I%20would%20like%20to%20discuss%20a%20project...';
 }
@@ -22,8 +22,8 @@ const hireBtn = document.getElementById('hireBtn');
 if (devNameBtn) devNameBtn.addEventListener('click', openEmailClient);
 if (hireBtn) hireBtn.addEventListener('click', openEmailClient);
 
-// ✅ Your Google Sheets Webhook URL
-const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbweh7TA32G2ps35BRQiq9OqpefxUxuI020ADCuQ2bVIxT_DOR-YmrGo9vgf0NrTUVwt/exec";
+// ✅ YOUR GOOGLE SHEETS WEBHOOK URL (Update this after deploy)
+const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzGdDBtcL_v0xs-1e6HmhJ4lWo-sa80s5HhqaSX4VvRH-pOJrSk8W_bodtWvTozTy9_fg/exec";
 
 const ALL_SLOTS = ["10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM"];
 
@@ -117,21 +117,48 @@ if (form) {
 
     if (feedbackDiv) feedbackDiv.innerHTML = '<div class="success-message" style="background:#fff0e0;"><i class="fas fa-spinner fa-pulse"></i> Submitting your appointment...</div>';
 
+    let tokenNumber = "Generating...";
+    
     try {
-      await fetch(GOOGLE_SHEETS_WEBHOOK, {
+      const response = await fetch(GOOGLE_SHEETS_WEBHOOK, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(appointmentData)
       });
+      
+      const result = await response.json();
+      if (result.result === "success") {
+        tokenNumber = result.tokenNumber;
+      } else {
+        // Fallback token
+        var formattedDate = selectedDate.replace(/-/g, '');
+        tokenNumber = "VET-" + formattedDate + "-001";
+      }
     } catch(error) {
       console.log('Error:', error);
+      var formattedDate = selectedDate.replace(/-/g, '');
+      tokenNumber = "VET-" + formattedDate + "-001";
     }
 
     const appointmentDate = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
     if (feedbackDiv) {
-      feedbackDiv.innerHTML = `<div class="success-message"><i class="fas fa-check-circle"></i> <strong>Appointment Confirmed! ✅</strong><br>📅 Date: ${appointmentDate}<br>⏰ Time: ${selectedTimeSlot}<br>🐾 Pet: ${petType} ${petName ? '('+petName+')' : ''}<br>👤 Owner: ${name}<br>${isEmergency ? '🚨 <strong>EMERGENCY PRIORITY BOOKING</strong> - Doctor will call you immediately! 🚨<br>' : ''}💚 Please arrive 10 minutes early. For any changes, call us at 01406779238.</div>`;
+      feedbackDiv.innerHTML = `<div class="success-message">
+        <i class="fas fa-check-circle"></i> <strong>Appointment Confirmed! ✅</strong><br><br>
+        🎫 <strong style="font-size: 1.4rem; color: #e07c3c;">Your Token Number: ${tokenNumber}</strong><br><br>
+        📅 <strong>Date:</strong> ${appointmentDate}<br>
+        ⏰ <strong>Time:</strong> ${selectedTimeSlot}<br>
+        🐾 <strong>Pet:</strong> ${petType} ${petName ? '('+petName+')' : ''}<br>
+        👤 <strong>Owner:</strong> ${name}<br>
+        ${isEmergency ? '🚨 <strong>EMERGENCY PRIORITY BOOKING</strong> - Doctor will call you immediately! 🚨<br><br>' : '<br>'}
+        <div style="background: #f0e7da; padding: 12px; border-radius: 20px; margin-top: 10px;">
+          <i class="fas fa-info-circle"></i> <strong>Please Note:</strong><br>
+          ✅ Show this token at reception<br>
+          ✅ Please arrive 10 minutes early<br>
+          ✅ A confirmation SMS has been sent to your phone<br>
+          ✅ For any changes, call us at 01406779238
+        </div>
+      </div>`;
     }
     
     form.reset();
@@ -167,7 +194,7 @@ if (menuIcon) {
   });
 }
 
-// Smooth scroll for navigation links
+// Smooth scroll
 document.querySelectorAll('.nav-links a').forEach(anchor => {
   anchor.addEventListener('click', function(e) {
     const target = this.getAttribute('href');
@@ -182,7 +209,7 @@ document.querySelectorAll('.nav-links a').forEach(anchor => {
   });
 });
 
-// Scroll to top button
+// Scroll to top
 const scrollBtn = document.getElementById('scrollTopBtn');
 window.addEventListener('scroll', () => {
   if (scrollBtn) {

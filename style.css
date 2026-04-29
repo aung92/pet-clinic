@@ -93,7 +93,7 @@ body {
   padding: 0 24px;
 }
 
-/* Top Bar with Time & Date */
+/* Top Bar */
 .top-bar {
   background: #1a2a2f;
   color: #e0e7e9;
@@ -151,7 +151,6 @@ body {
 .navbar.scrolled {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(15px);
-  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
 }
 .nav-container {
   display: flex;
@@ -164,7 +163,6 @@ body {
   font-size: 1.7rem;
   font-weight: 800;
   color: var(--primary);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 .logo h1 i {
   margin-right: 8px;
@@ -571,7 +569,7 @@ input:focus, select:focus, textarea:focus {
 .footer-links li { margin-bottom: 12px; }
 .footer-links li a { display: inline-flex; align-items: center; }
 
-/* Social Icons - Hover er somoi white hobe */
+/* Social Icons */
 .social-links {
   display: flex;
   gap: 15px;
@@ -597,9 +595,6 @@ input:focus, select:focus, textarea:focus {
   transform: translateY(-4px);
   box-shadow: 0 5px 15px rgba(224, 124, 60, 0.3);
 }
-.social-links a i {
-  transition: all 0.3s ease;
-}
 .social-links a:hover i {
   color: #ffffff;
 }
@@ -616,7 +611,6 @@ input:focus, select:focus, textarea:focus {
   text-align: center;
 }
 
-/* Footer Credits */
 .footer-credits {
   display: flex;
   justify-content: center;
@@ -679,10 +673,6 @@ input:focus, select:focus, textarea:focus {
   .separator {
     display: none;
   }
-  .credit-line {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
 }
 @media (max-width: 992px) {
   .footer-grid { grid-template-columns: repeat(2, 1fr); gap: 35px; }
@@ -710,9 +700,6 @@ input:focus, select:focus, textarea:focus {
 }
 .floating-wa { right: 30px; background: #25D366; }
 .floating-call { right: 100px; background: var(--primary); width: 52px; height: 52px; font-size: 24px; }
-.floating-wa:hover, .floating-call:hover {
-  transform: scale(1.08);
-}
 .scroll-top {
   position: fixed;
   bottom: 30px;
@@ -734,10 +721,6 @@ input:focus, select:focus, textarea:focus {
 .scroll-top.show {
   opacity: 1;
   pointer-events: auto;
-}
-.scroll-top:hover {
-  background: var(--primary);
-  transform: scale(1.05);
 }
 @media (max-width: 860px) {
   .nav-links {
