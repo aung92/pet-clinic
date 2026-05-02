@@ -1,16 +1,17 @@
 // ============================================
-// DOCTOR DASHBOARD - COMPLETE SCRIPT
-// A to Z Workable | Bangladesh Time Zone (UTC+6)
+// ADMIN DASHBOARD - COMPLETE SCRIPT
+// Auto Sync | Full Control | A to Z Workable
 // ============================================
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
 
 let allAppointments = [];
-let currentModalBookingId = null;
-let currentViewBookingId = null;
+let doctors = [];
+let services = [];
 let currentPage = 1;
-let itemsPerPage = 10;
-let doctorChart = null;
+let itemsPerPage = 20;
+let adminChart = null;
+let autoSyncInterval = null;
 
 // ============================================
 // BANGLADESH TIME ZONE (UTC+6)
@@ -20,6 +21,7 @@ function getBangladeshTime() {
   const bangladeshTime = new Date(now.getTime() + (6 * 60 * 60 * 1000));
   return bangladeshTime;
 }
+
 function getBangladeshDate() {
   const bdTime = getBangladeshTime();
   return `${bdTime.getFullYear()}-${String(bdTime.getMonth() + 1).padStart(2, '0')}-${String(bdTime.getDate()).padStart(2, '0')}`;
@@ -29,15 +31,18 @@ function getBangladeshDate() {
 // AUTHENTICATION CHECK
 // ============================================
 (function() {
-  if (!sessionStorage.getItem('doctor_logged_in')) window.location.href = 'doctor-login.html';
-  document.getElementById('welcomeName').innerText = (sessionStorage.getItem('doctor_name') || 'Dr. Mitesh').split(' ')[0];
-  document.getElementById('doctorName').innerText = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh';
-  document.getElementById('doctorRole').innerText = sessionStorage.getItem('doctor_role') || 'Senior Veterinarian';
-  document.getElementById('profileName').innerText = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh';
-  document.getElementById('profileEmail').innerText = sessionStorage.getItem('doctor_email') || 'doctor@vetforpet.com';
-  document.getElementById('profileRole').innerText = sessionStorage.getItem('doctor_role') || 'Senior Veterinarian';
-  document.getElementById('profileSpecialization').innerText = sessionStorage.getItem('doctor_specialization') || 'General Veterinary';
-  document.getElementById('profileJoined').innerText = '2024';
+  const isLoggedIn = sessionStorage.getItem('admin_logged_in');
+  if (!isLoggedIn || isLoggedIn !== 'true') {
+    window.location.href = 'admin-login.html';
+    return;
+  }
+  
+  const adminName = sessionStorage.getItem('admin_name') || 'Admin';
+  const adminRole = sessionStorage.getItem('admin_role') || 'Administrator';
+  
+  document.getElementById('welcomeName').innerText = adminName;
+  document.getElementById('adminName').innerText = adminName;
+  document.getElementById('adminRole').innerText = adminRole;
 })();
 
 // ============================================
@@ -46,47 +51,99 @@ function getBangladeshDate() {
 document.addEventListener('DOMContentLoaded', function() {
   updateDateTime();
   setInterval(updateDateTime, 1000);
+  
   setupNavigation();
   loadAllData();
-  const todayPicker = document.getElementById('todayDatePicker');
-  if (todayPicker) { todayPicker.value = getBangladeshDate(); todayPicker.addEventListener('change', () => loadTodayAppointments()); }
-  setupModalClose();
+  loadDoctors();
+  loadServices();
+  loadSettings();
+  loadSlotConfig();
+  loadPricing();
   
-  // Medical Modal Button Listeners
-  const medicalModalClose = document.getElementById('medicalModalCloseBtn');
-  if (medicalModalClose) medicalModalClose.onclick = closeMedicalModal;
-  const medicalModalCancel = document.getElementById('medicalModalCancelBtn');
-  if (medicalModalCancel) medicalModalCancel.onclick = closeMedicalModal;
+  // Setup auto sync every 15 seconds
+  startAutoSync();
+  
+  // Setup refresh button
+  const refreshBtn = document.querySelector('.refresh-btn');
+  if (refreshBtn) refreshBtn.onclick = () => refreshAllData();
+  
+  // Setup report date picker
+  const reportDate = document.getElementById('reportDate');
+  if (reportDate) reportDate.value = getBangladeshDate();
 });
+
 function updateDateTime() {
   const bdTime = getBangladeshTime();
-  document.getElementById('currentDate').innerText = bdTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  document.getElementById('currentTime').innerText = bdTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('currentDate').innerText = bdTime.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+  });
+  document.getElementById('currentTime').innerText = bdTime.toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit'
+  });
 }
 
 // ============================================
-// NAVIGATION
+// AUTO SYNC FUNCTION
 // ============================================
-function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const page = item.getAttribute('data-page');
-      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-      item.classList.add('active');
-      document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
-      document.getElementById(page + 'Page').classList.add('active');
-      document.getElementById('pageTitle').innerText = item.querySelector('span')?.innerText || page;
-      if (page === 'today') loadTodayAppointments();
-      if (page === 'all') loadAllAppointments();
-      if (page === 'prescriptions') loadPrescriptions();
-      if (page === 'medical') loadMedicalRecords();
-      if (page === 'reports') loadDoctorReport();
-    });
-  });
+function startAutoSync() {
+  if (autoSyncInterval) clearInterval(autoSyncInterval);
+  autoSyncInterval = setInterval(async () => {
+    await autoSyncData();
+  }, 15000); // Sync every 15 seconds
 }
-function goToPage(pageId) { document.querySelector(`.nav-item[data-page="${pageId}"]`).click(); }
-function refreshAllData() { loadAllData(); showToast('Data refreshed!', 'success'); }
+
+async function autoSyncData() {
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=getAppointments&t=${Date.now()}`);
+    const text = await response.text();
+    const jsonStr = text.match(/\((.*)\)/)[1];
+    const data = JSON.parse(jsonStr);
+    
+    if (data && data.appointments) {
+      const oldCount = allAppointments.length;
+      allAppointments = data.appointments;
+      
+      // Update UI
+      updateDashboardStats();
+      loadRecentAppointments();
+      updateQuickStats();
+      
+      // Update appointment badge
+      const today = getBangladeshDate();
+      const todayCount = allAppointments.filter(a => a.date === today).length;
+      const badge = document.getElementById('appointmentBadge');
+      if (badge) badge.innerText = todayCount;
+      
+      // Update total records
+      const totalRecords = document.getElementById('totalRecords');
+      if (totalRecords) totalRecords.innerText = allAppointments.length;
+      
+      // Show sync status
+      const syncStatus = document.getElementById('syncStatus');
+      if (syncStatus) {
+        syncStatus.innerHTML = `<i class="fas fa-check-circle"></i> Synced at ${new Date().toLocaleTimeString()}`;
+        syncStatus.style.opacity = '1';
+        setTimeout(() => { syncStatus.style.opacity = '0'; }, 2000);
+      }
+      
+      // Reload current page if on appointments view
+      if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
+        loadAllAppointmentsList();
+      }
+      
+      console.log('Auto sync completed. Total appointments:', allAppointments.length);
+    }
+  } catch (error) {
+    console.error('Auto sync error:', error);
+  }
+}
+
+function refreshAllData() {
+  autoSyncData();
+  loadDoctors();
+  loadServices();
+  showToast('All data refreshed successfully!', 'success');
+}
 
 // ============================================
 // API CALLS
@@ -94,647 +151,923 @@ function refreshAllData() { loadAllData(); showToast('Data refreshed!', 'success
 async function fetchFromAPI(action, params = {}) {
   try {
     let url = `${SCRIPT_URL}?action=${action}&t=${Date.now()}`;
-    if (action === 'getClientBookings' && params.phone) url += `&phone=${encodeURIComponent(params.phone)}`;
+    if (action === 'getClientBookings' && params.phone) {
+      url += `&phone=${encodeURIComponent(params.phone)}`;
+    }
+    
     const response = await fetch(url);
     const text = await response.text();
     const jsonStr = text.match(/\((.*)\)/)[1];
     return JSON.parse(jsonStr);
-  } catch (error) { console.error(error); return null; }
-}
-async function saveMedicalInfo(bookingId, medicalData) {
-  try {
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      mode: 'no-cors', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ action: 'updateMedicalInfo', bookingId, ...medicalData }) 
-    });
-    return true;
-  } catch (error) { console.error(error); return false; }
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
 }
 
 // ============================================
-// LOAD DATA
+// NAVIGATION
+// ============================================
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+  const pages = document.querySelectorAll('.page-content');
+  
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = item.getAttribute('data-page');
+      
+      navItems.forEach(nav => nav.classList.remove('active'));
+      item.classList.add('active');
+      
+      pages.forEach(p => p.classList.remove('active'));
+      const targetPage = document.getElementById(page + 'Page');
+      if (targetPage) targetPage.classList.add('active');
+      
+      document.getElementById('pageTitle').innerText = item.querySelector('span')?.innerText || page;
+      
+      if (page === 'appointments') loadAllAppointmentsList();
+      if (page === 'reports') { updateReportStats(); createWeeklyChart(); }
+    });
+  });
+}
+
+function goToPage(pageId) {
+  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if (navItem) navItem.click();
+}
+
+// ============================================
+// LOAD APPOINTMENTS DATA (SYNC FROM SHEET)
 // ============================================
 async function loadAllData() {
+  showLoading('Loading data...');
+  
   const data = await fetchFromAPI('getAppointments');
   if (data && data.appointments) {
     allAppointments = data.appointments;
+    console.log('Loaded appointments:', allAppointments.length);
+    
     updateDashboardStats();
-    loadTodayPreview();
-    loadRecentActivity();
-    const todayPicker = document.getElementById('todayDatePicker');
-    if (todayPicker) loadTodayAppointments(todayPicker.value);
+    loadRecentAppointments();
+    updateQuickStats();
+    
+    // Update appointment badge
+    const today = getBangladeshDate();
+    const todayCount = allAppointments.filter(a => a.date === today).length;
+    const badge = document.getElementById('appointmentBadge');
+    if (badge) badge.innerText = todayCount;
+    
+    // Update total records
+    const totalRecords = document.getElementById('totalRecords');
+    if (totalRecords) totalRecords.innerText = allAppointments.length;
+    
+    // Also load appointments list if on that page
+    if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
+      loadAllAppointmentsList();
+    }
+  } else {
+    console.warn('No appointments data received');
+    showToast('Could not load data from server', 'error');
   }
 }
+
 function updateDashboardStats() {
   const today = getBangladeshDate();
   const todayApps = allAppointments.filter(a => a.date === today);
+  
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weeklyApps = allAppointments.filter(a => new Date(a.date) >= weekAgo);
+  
+  const monthAgo = new Date();
+  monthAgo.setMonth(monthAgo.getMonth() - 1);
+  const monthlyApps = allAppointments.filter(a => new Date(a.date) >= monthAgo);
+  
+  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
   const completedApps = allAppointments.filter(a => a.status === 'Completed');
   const pendingApps = allAppointments.filter(a => a.status === 'Confirmed' || a.status === 'In Progress');
-  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
-  document.getElementById('todayStatsCount').innerText = todayApps.length;
-  document.getElementById('todayBadge').innerText = todayApps.length;
-  document.getElementById('completedCount').innerText = completedApps.length;
-  document.getElementById('pendingCount').innerText = pendingApps.length;
-  document.getElementById('totalPetsCount').innerText = uniquePets.length;
+  
+  document.getElementById('totalToday').innerText = todayApps.length;
+  document.getElementById('totalWeekly').innerText = weeklyApps.length;
+  document.getElementById('totalMonthly').innerText = monthlyApps.length;
+  document.getElementById('totalPets').innerText = uniquePets.length;
+  document.getElementById('totalCompleted').innerText = completedApps.length;
+  document.getElementById('totalPending').innerText = pendingApps.length;
 }
 
-// ============================================
-// TODAY'S APPOINTMENTS
-// ============================================
-async function loadTodayAppointments() {
-  const container = document.getElementById('todayAppointments');
+function updateQuickStats() {
+  // Calculate total revenue (assuming each appointment = 500 BDT average)
+  const totalRevenue = allAppointments.length * 500;
+  const revenueElem = document.getElementById('totalRevenue');
+  if (revenueElem) revenueElem.innerText = totalRevenue.toLocaleString();
+  
+  // Completion rate
+  const completed = allAppointments.filter(a => a.status === 'Completed').length;
+  const completionRate = allAppointments.length > 0 ? Math.round((completed / allAppointments.length) * 100) : 0;
+  const rateElem = document.getElementById('completionRate');
+  if (rateElem) rateElem.innerText = completionRate;
+  
+  // Active doctors count
+  const doctorsElem = document.getElementById('activeDoctors');
+  if (doctorsElem) doctorsElem.innerText = doctors.length || 1;
+}
+
+function loadRecentAppointments() {
+  const container = document.getElementById('recentAppointments');
   if (!container) return;
-  const selectedDate = document.getElementById('todayDatePicker')?.value || getBangladeshDate();
-  container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-  const filteredApps = allAppointments.filter(a => a.date === selectedDate);
-  if (filteredApps.length === 0) { 
-    container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-day"></i><p>No appointments for ${selectedDate}</p></div>`; 
-    return; 
-  }
-  filteredApps.sort((a, b) => a.time.localeCompare(b.time));
-  container.innerHTML = filteredApps.map(app => createAppointmentCard(app)).join('');
-}
-function loadTodayPreview() {
-  const container = document.getElementById('todayPreview');
-  if (!container) return;
-  const today = getBangladeshDate();
-  const todayApps = allAppointments.filter(a => a.date === today).slice(0, 5);
-  if (todayApps.length === 0) { container.innerHTML = '<div class="empty-state">No appointments today</div>'; return; }
-  container.innerHTML = todayApps.map(app => `<div class="history-item" onclick="viewAppointment('${app.bookingId}')"><div style="display:flex;justify-content:space-between"><strong>🐾 ${escapeHtml(app.petName)}</strong><span class="token">${app.token}</span></div><div>⏰ ${app.time} | 👤 ${escapeHtml(app.ownerName)}</div></div>`).join('');
-}
-function loadRecentActivity() {
-  const container = document.getElementById('recentActivity');
-  if (!container) return;
-  const recent = [...allAppointments].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0,5);
-  if (recent.length === 0) { container.innerHTML = '<div class="empty-state">No recent activity</div>'; return; }
-  container.innerHTML = recent.map(app => `<div class="history-item" style="border-left-color:#22c55e" onclick="viewAppointment('${app.bookingId}')"><div style="display:flex;justify-content:space-between"><strong>🐾 ${escapeHtml(app.petName)}</strong><span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div><div>👤 ${escapeHtml(app.ownerName)} | ⏰ ${app.time} | 📅 ${app.date}</div></div>`).join('');
-}
-
-// ============================================
-// ALL APPOINTMENTS
-// ============================================
-async function loadAllAppointments() {
-  const container = document.getElementById('allAppointments');
-  if (!container) return;
-  const filterText = document.getElementById('allFilterInput')?.value.toLowerCase() || '';
-  const statusFilter = document.getElementById('statusFilter')?.value || 'all';
-  let filtered = allAppointments.filter(a => (!filterText || a.petName.toLowerCase().includes(filterText) || a.ownerName.toLowerCase().includes(filterText) || a.ownerPhone.includes(filterText) || a.token.toLowerCase().includes(filterText)) && (statusFilter === 'all' || a.status === statusFilter));
-  filtered.sort((a,b) => new Date(b.date) - new Date(a.date));
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginated = filtered.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage);
-  container.innerHTML = paginated.length ? paginated.map(app => createHistoryItem(app)).join('') : '<div class="empty-state">No appointments found</div>';
-  const pagination = document.getElementById('pagination');
-  if (pagination && totalPages > 1) {
-    let html = '';
-    for (let i=1; i<=Math.min(totalPages,10); i++) html += `<button class="${i===currentPage?'active':''}" onclick="goToPageNum(${i})">${i}</button>`;
-    pagination.innerHTML = html;
-  } else if (pagination) pagination.innerHTML = '';
-}
-function goToPageNum(page) { currentPage = page; loadAllAppointments(); }
-function filterAllAppointments() { currentPage = 1; loadAllAppointments(); }
-
-// ============================================
-// SEARCH
-// ============================================
-async function searchPatients() {
-  const term = document.getElementById('searchInput')?.value.toLowerCase().trim() || '';
-  const container = document.getElementById('searchResults');
-  if (!term) { container.innerHTML = '<div class="empty-state">Enter search term</div>'; return; }
-  container.innerHTML = '<div class="loading">Searching...</div>';
-  const results = allAppointments.filter(a => a.petName.toLowerCase().includes(term) || a.ownerName.toLowerCase().includes(term) || a.ownerPhone.includes(term));
-  if (results.length === 0) { container.innerHTML = '<div class="empty-state">No patients found</div>'; return; }
-  container.innerHTML = results.map(app => createAppointmentCard(app)).join('');
-}
-
-// ============================================
-// PRESCRIPTIONS & MEDICAL RECORDS
-// ============================================
-async function loadPrescriptions() {
-  const container = document.getElementById('prescriptionsList');
-  if (!container) return;
-  const prescriptions = allAppointments.filter(a => a.prescription && a.prescription !== '');
-  if (prescriptions.length === 0) { container.innerHTML = '<div class="empty-state">No prescriptions yet</div>'; return; }
-  container.innerHTML = prescriptions.map(app => `<div class="history-item" onclick="viewAppointment('${app.bookingId}')"><div style="display:flex;justify-content:space-between"><strong>🐾 ${escapeHtml(app.petName)}</strong><span class="token">${app.token}</span></div><div><strong>💊 Prescription:</strong><br><div style="background:#f1f5f9;padding:10px;border-radius:8px;margin-top:5px">${escapeHtml(app.prescription)}</div></div>${app.diagnosis?`<div><strong>📝 Diagnosis:</strong> ${escapeHtml(app.diagnosis)}</div>`:''}</div>`).join('');
-}
-async function loadMedicalRecords() {
-  const container = document.getElementById('medicalRecordsList');
-  if (!container) return;
-  const records = allAppointments.filter(a => a.diagnosis || a.prescription);
-  if (records.length === 0) { container.innerHTML = '<div class="empty-state">No medical records yet</div>'; return; }
-  container.innerHTML = records.map(app => `<div class="history-item" onclick="viewAppointment('${app.bookingId}')"><div style="display:flex;justify-content:space-between"><strong>🐾 ${escapeHtml(app.petName)}</strong><span class="token">${app.token}</span></div><div><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis || 'N/A')}</div><div><strong>Prescription:</strong> ${escapeHtml((app.prescription||'').substring(0,100))}${(app.prescription||'').length>100?'...':''}</div></div>`).join('');
-}
-
-// ============================================
-// DOCTOR REPORT
-// ============================================
-async function loadDoctorReport() {
-  const period = document.getElementById('reportPeriod')?.value || 'weekly';
-  let filtered = [...allAppointments];
-  if (period === 'weekly') { const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate()-7); filtered = filtered.filter(a => new Date(a.date) >= weekAgo); }
-  else if (period === 'monthly') { const monthAgo = new Date(); monthAgo.setMonth(monthAgo.getMonth()-1); filtered = filtered.filter(a => new Date(a.date) >= monthAgo); }
-  else { const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear()-1); filtered = filtered.filter(a => new Date(a.date) >= yearAgo); }
-  document.getElementById('reportTotal').innerText = filtered.length;
-  document.getElementById('reportCompleted').innerText = filtered.filter(a => a.status === 'Completed').length;
-  document.getElementById('reportCancelled').innerText = filtered.filter(a => a.status === 'Cancelled').length;
-  updateDoctorChart(filtered);
-}
-function updateDoctorChart(appointments) {
-  const last7Days = [];
-  for (let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate()-i); last7Days.push(d.toISOString().split('T')[0]); }
-  const counts = last7Days.map(d => appointments.filter(a => a.date === d).length);
-  const ctx = document.getElementById('doctorChart')?.getContext('2d');
-  if (!ctx) return;
-  if (doctorChart) doctorChart.destroy();
-  doctorChart = new Chart(ctx, { type: 'bar', data: { labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US',{weekday:'short'})), datasets: [{ label: 'Appointments', data: counts, backgroundColor: '#f97316', borderRadius: 8 }] }, options: { responsive: true, plugins: { legend: { display: false } } } });
-}
-
-// ============================================
-// VIEW APPOINTMENT
-// ============================================
-function viewAppointment(bookingId) {
-  const app = allAppointments.find(a => a.bookingId === bookingId);
-  if (!app) return;
-  currentViewBookingId = bookingId;
-  document.getElementById('viewAppointmentDetails').innerHTML = `
-    <div><strong>Token:</strong> ${app.token}</div>
-    <div><strong>Date:</strong> ${app.date} | <strong>Time:</strong> ${app.time}</div>
-    <div><strong>Pet:</strong> ${escapeHtml(app.petName)} (${app.petAge||'N/A'})</div>
-    <div><strong>Owner:</strong> ${escapeHtml(app.ownerName)} | <strong>Phone:</strong> ${app.ownerPhone}</div>
-    <div><strong>Symptoms:</strong> ${escapeHtml(app.symptoms||'N/A')}</div>
-    <div><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis||'N/A')}</div>
-    <div><strong>Prescription:</strong><br>${escapeHtml(app.prescription||'N/A')}</div>
-    <div><strong>Status:</strong> <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
-  `;
-  document.getElementById('viewAppointmentModal').classList.add('show');
-  document.getElementById('viewAppointmentModal').style.display = 'flex';
-}
-function closeViewModal() { const m = document.getElementById('viewAppointmentModal'); m.classList.remove('show'); m.style.display = 'none'; }
-function openMedicalFromView() { closeViewModal(); openMedicalModal(currentViewBookingId); }
-
-// ============================================
-// PRINT APPOINTMENT FROM VIEW
-// ============================================
-function printAppointmentFromView() {
-  const app = allAppointments.find(a => a.bookingId === currentViewBookingId);
-  if(!app) return;
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Appointment Details - ${app.token}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Times New Roman',Arial,sans-serif;padding:40px;background:white}
-.print-container{max-width:800px;margin:0 auto}
-.header{text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #f97316}
-.clinic-name{font-size:28px;font-weight:800;color:#f97316}
-.clinic-tagline{font-size:12px;color:#64748b;margin-bottom:15px}
-.clinic-details{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;font-size:11px;color:#475569;margin-top:10px}
-.doc-title{text-align:center;margin:20px 0}
-.doc-title h2{background:#f97316;color:white;display:inline-block;padding:8px 30px;border-radius:50px;font-size:18px}
-.info-table{width:100%;border-collapse:collapse;margin:20px 0}
-.info-table td{padding:10px;border-bottom:1px solid #e2e8f0}
-.info-label{font-weight:700;width:180px;background:#f8fafc}
-.footer{margin-top:30px;padding-top:20px;text-align:center;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8}
-</style>
-</head>
-<body>
-<div class="print-container">
-<div class="header"><div class="clinic-name">🐾 VET FOR PET CLINIC</div><div class="clinic-tagline">Advanced Veterinary Care | Compassion at Heart</div>
-<div class="clinic-details"><div>📍 PCXR+55F, Titash Road, Dhaka, Bangladesh</div><div>📞 01406-779238 | 🚨 01609-420061</div><div>✉️ info@vetforpet.com</div></div></div>
-<div class="doc-title"><h2>📋 COMPLETE APPOINTMENT DETAILS 📋</h2></div>
-<table class="info-table">
-<tr><td class="info-label">🆔 Token ID</td><td>${app.token}</td></tr>
-<tr><td class="info-label">📅 Appointment Date</td><td>${app.date}</td></tr>
-<tr><td class="info-label">⏰ Appointment Time</td><td>${app.time}</td></tr>
-<tr><td class="info-label">🐾 Pet Name</td><td>${escapeHtml(app.petName)}</td></tr>
-<tr><td class="info-label">🎂 Pet Age</td><td>${app.petAge || 'N/A'}</td></tr>
-<tr><td class="info-label">⚖️ Weight</td><td>${app.weight || 'N/A'} kg</td></tr>
-<tr><td class="info-label">👤 Owner Name</td><td>${escapeHtml(app.ownerName)}</td></tr>
-<tr><td class="info-label">📞 Phone Number</td><td>${app.ownerPhone}</td></tr>
-<tr><td class="info-label">📋 Symptoms / Reason</td><td>${escapeHtml(app.symptoms || 'N/A')}</td></tr>
-<tr><td class="info-label">🩺 Diagnosis</td><td>${escapeHtml(app.diagnosis || 'N/A')}</td></tr>
-<tr><td class="info-label">💊 Prescription</td><td><pre style="white-space:pre-wrap; margin:0;">${escapeHtml(app.prescription || 'N/A')}</pre></td></tr>
-<tr><td class="info-label">📝 Treatment Plan</td><td>${escapeHtml(app.treatmentPlan || 'N/A')}</td></tr>
-<tr><td class="info-label">📅 Follow-up Date</td><td>${app.followUpDate || 'N/A'}</td></tr>
-<tr><td class="info-label">✅ Status</td><td>${app.status || 'Confirmed'}</td></tr>
-</table>
-<div class="footer"><p>This is a computer generated document. For any queries, please contact our clinic.</p><p>Generated on: ${new Date().toLocaleString()} | © ${new Date().getFullYear()} VET FOR PET CLINIC</p></div>
-</div>
-</body></html>`);
-  printWindow.document.close();
-  printWindow.print();
-}
-
-// ============================================
-// MEDICAL MODAL - COMPLETE WORKING VERSION
-// ============================================
-function openMedicalModal(bookingId) {
-  const appointment = allAppointments.find(a => a.bookingId === bookingId);
-  if (!appointment) {
-    showToast('Appointment not found!', 'error');
+  
+  const recent = [...allAppointments]
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 5);
+  
+  if (recent.length === 0) {
+    container.innerHTML = '<div class="empty-state">No appointments yet</div>';
     return;
   }
   
-  currentModalBookingId = bookingId;
+  container.innerHTML = recent.map(app => `
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong>🐾 ${escapeHtml(app.petName)}</strong>
+          <div style="font-size: 0.8rem; color: #64748b;">📅 ${app.date} | ⏰ ${app.time}</div>
+        </div>
+        <div>
+          <span class="token">${app.token}</span>
+          <span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span>
+        </div>
+      </div>
+      <div style="margin-top: 8px;">
+        👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================
+// ALL APPOINTMENTS LIST (with Pagination & Filters)
+// ============================================
+function loadAllAppointmentsList() {
+  const container = document.getElementById('allAppointmentsList');
+  if (!container) return;
   
-  // Patient Summary
-  document.getElementById('summaryPetName').innerHTML = `<i class="fas fa-paw"></i> ${escapeHtml(appointment.petName || 'Unknown')}`;
-  document.getElementById('summaryDate').innerText = appointment.date || 'N/A';
-  document.getElementById('summaryTime').innerText = appointment.time || 'N/A';
-  document.getElementById('summaryToken').innerHTML = `<i class="fas fa-ticket-alt"></i> ${appointment.token || 'N/A'}`;
-  document.getElementById('summaryOwner').innerHTML = escapeHtml(appointment.ownerName || 'Unknown');
-  document.getElementById('summaryPhone').innerHTML = appointment.ownerPhone || 'N/A';
-  document.getElementById('modalSymptoms').innerHTML = escapeHtml(appointment.symptoms || 'No symptoms recorded');
+  const filterText = document.getElementById('filterInput')?.value.toLowerCase() || '';
+  const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+  const dateFilter = document.getElementById('dateFilter')?.value || 'all';
   
-  // Medical Form Fields
-  document.getElementById('modalTemperature').value = appointment.temperature || '';
-  document.getElementById('modalHeartRate').value = appointment.heartRate || '';
-  document.getElementById('modalRespiratory').value = appointment.respiratoryRate || '';
-  document.getElementById('modalDiagnosis').value = appointment.diagnosis || '';
-  document.getElementById('modalClinicalFindings').value = appointment.clinicalFindings || '';
-  document.getElementById('modalTreatmentPlan').value = appointment.treatmentPlan || '';
-  document.getElementById('modalFollowup').value = appointment.followUpDate || '';
-  document.getElementById('modalNotes').value = appointment.notes || '';
-  document.getElementById('modalStatus').value = appointment.status || 'Confirmed';
-  document.getElementById('modalOwnerEmail').value = appointment.ownerEmail || '';
+  let filtered = [...allAppointments];
   
-  // Load prescription list
-  loadPrescriptionList(appointment.prescription || '');
+  // Apply text filter
+  if (filterText) {
+    filtered = filtered.filter(a => 
+      a.petName.toLowerCase().includes(filterText) ||
+      a.ownerName.toLowerCase().includes(filterText) ||
+      a.ownerPhone.includes(filterText) ||
+      a.token.toLowerCase().includes(filterText)
+    );
+  }
   
-  // Load reminder preferences
-  const smsCheckbox = document.getElementById('modalSmsReminder');
-  const emailCheckbox = document.getElementById('modalEmailReminder');
-  if (smsCheckbox) smsCheckbox.checked = appointment.smsReminder === 'true';
-  if (emailCheckbox) emailCheckbox.checked = appointment.emailReminder === 'true';
+  // Apply status filter
+  if (statusFilter !== 'all') {
+    filtered = filtered.filter(a => a.status === statusFilter);
+  }
   
-  // Show modal
-  const modal = document.getElementById('medicalModal');
+  // Apply date filter
+  const today = getBangladeshDate();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  
+  const monthAgo = new Date();
+  monthAgo.setMonth(monthAgo.getMonth() - 1);
+  
+  switch(dateFilter) {
+    case 'today':
+      filtered = filtered.filter(a => a.date === today);
+      break;
+    case 'tomorrow':
+      filtered = filtered.filter(a => a.date === tomorrowStr);
+      break;
+    case 'week':
+      filtered = filtered.filter(a => new Date(a.date) >= weekAgo);
+      break;
+    case 'month':
+      filtered = filtered.filter(a => new Date(a.date) >= monthAgo);
+      break;
+  }
+  
+  // Sort by date (newest first)
+  filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const start = (currentPage - 1) * itemsPerPage;
+  const paginated = filtered.slice(start, start + itemsPerPage);
+  
+  if (paginated.length === 0) {
+    container.innerHTML = '<div class="empty-state">No appointments found</div>';
+  } else {
+    container.innerHTML = paginated.map(app => `
+      <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <strong>🐾 ${escapeHtml(app.petName)}</strong>
+            <div style="font-size: 0.8rem; color: #64748b;">📅 ${app.date} | ⏰ ${app.time}</div>
+          </div>
+          <div>
+            <span class="token">${app.token}</span>
+            <span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span>
+          </div>
+        </div>
+        <div style="margin: 8px 0;">
+          👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}
+        </div>
+        <div style="font-size: 0.85rem;">
+          📋 Symptoms: ${escapeHtml(app.symptoms || 'N/A')}
+          ${app.diagnosis ? `<br>🩺 Diagnosis: ${escapeHtml(app.diagnosis)}` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  // Render pagination
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+  const container = document.getElementById('pagination');
+  if (!container) return;
+  
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+    html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPageNum(${i})">${i}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function goToPageNum(page) {
+  currentPage = page;
+  loadAllAppointmentsList();
+}
+
+function filterAppointments() {
+  currentPage = 1;
+  loadAllAppointmentsList();
+}
+
+function getStatusClass(status) {
+  if (status === 'Completed') return 'completed';
+  if (status === 'Cancelled') return 'cancelled';
+  if (status === 'In Progress') return 'progress';
+  return 'confirmed';
+}
+
+// ============================================
+// VIEW APPOINTMENT DETAILS
+// ============================================
+function viewAppointment(bookingId) {
+  const appointment = allAppointments.find(a => a.bookingId === bookingId);
+  if (!appointment) return;
+  
+  const modal = document.getElementById('viewAppointmentModal');
+  const detailsDiv = document.getElementById('appointmentDetails');
+  
+  if (!modal || !detailsDiv) return;
+  
+  detailsDiv.innerHTML = `
+    <div class="appointment-full-details">
+      <div class="detail-row"><strong>🆔 Token:</strong> ${appointment.token}</div>
+      <div class="detail-row"><strong>📅 Date:</strong> ${appointment.date}</div>
+      <div class="detail-row"><strong>⏰ Time:</strong> ${appointment.time}</div>
+      <div class="detail-row"><strong>🐾 Pet Name:</strong> ${escapeHtml(appointment.petName)}</div>
+      <div class="detail-row"><strong>🎂 Pet Age:</strong> ${appointment.petAge || 'N/A'}</div>
+      <div class="detail-row"><strong>⚖️ Weight:</strong> ${appointment.weight || 'N/A'} kg</div>
+      <div class="detail-row"><strong>👤 Owner Name:</strong> ${escapeHtml(appointment.ownerName)}</div>
+      <div class="detail-row"><strong>📞 Phone:</strong> ${appointment.ownerPhone}</div>
+      <div class="detail-row"><strong>📋 Symptoms:</strong> ${escapeHtml(appointment.symptoms || 'N/A')}</div>
+      <div class="detail-row"><strong>🩺 Diagnosis:</strong> ${escapeHtml(appointment.diagnosis || 'N/A')}</div>
+      <div class="detail-row"><strong>💊 Prescription:</strong><br>${escapeHtml(appointment.prescription || 'N/A')}</div>
+      <div class="detail-row"><strong>📝 Treatment Plan:</strong> ${escapeHtml(appointment.treatmentPlan || 'N/A')}</div>
+      <div class="detail-row"><strong>📅 Follow-up Date:</strong> ${appointment.followUpDate || 'N/A'}</div>
+      <div class="detail-row"><strong>✅ Status:</strong> <span class="status ${getStatusClass(appointment.status)}">${appointment.status || 'Confirmed'}</span></div>
+      <div class="detail-row"><strong>📆 Booked On:</strong> ${new Date(appointment.timestamp).toLocaleString()}</div>
+    </div>
+  `;
+  
+  modal.classList.add('show');
+  modal.style.display = 'flex';
+  window.currentViewBookingId = bookingId;
+}
+
+function closeViewAppointmentModal() {
+  const modal = document.getElementById('viewAppointmentModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+function deleteAppointmentFromModal() {
+  if (confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
+    allAppointments = allAppointments.filter(a => a.bookingId !== window.currentViewBookingId);
+    
+    // Update localStorage backup
+    const bookings = {};
+    allAppointments.forEach(a => {
+      if (!bookings[a.date]) bookings[a.date] = [];
+      bookings[a.date].push(a.timeSlot);
+    });
+    localStorage.setItem('vet_bookings', JSON.stringify(bookings));
+    
+    closeViewAppointmentModal();
+    refreshAllData();
+    showToast('Appointment deleted successfully', 'success');
+  }
+}
+
+// ============================================
+// DOCTOR MANAGEMENT (CRUD)
+// ============================================
+function loadDoctors() {
+  const stored = localStorage.getItem('clinic_doctors');
+  if (stored) {
+    doctors = JSON.parse(stored);
+  } else {
+    doctors = [
+      { id: 1, name: 'Dr. Mitesh Tripura', email: 'doctor@vetforpet.com', specialization: 'Senior Veterinary Surgeon', phone: '01406779238', schedule: 'Sat-Wed 9AM-9PM' }
+    ];
+    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+  }
+  renderDoctors();
+}
+
+function renderDoctors() {
+  const container = document.getElementById('doctorsList');
+  if (!container) return;
+  
+  if (doctors.length === 0) {
+    container.innerHTML = '<div class="empty-state">No doctors added yet</div>';
+    return;
+  }
+  
+  container.innerHTML = doctors.map(doc => `
+    <div class="history-item">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <div>
+          <strong><i class="fas fa-user-md"></i> ${escapeHtml(doc.name)}</strong>
+          <div style="font-size: 0.85rem; color: #64748b;">🔬 ${escapeHtml(doc.specialization)}</div>
+          <div style="font-size: 0.8rem;">📧 ${doc.email} | 📞 ${doc.phone || 'N/A'}</div>
+          <div style="font-size: 0.8rem;">⏰ ${doc.schedule || 'Flexible'}</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-secondary" onclick="editDoctor(${doc.id})"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn-danger" onclick="deleteDoctor(${doc.id})"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showAddDoctorModal() {
+  const modal = document.getElementById('addDoctorModal');
   if (modal) {
     modal.classList.add('show');
     modal.style.display = 'flex';
   }
 }
 
-function closeMedicalModal() {
-  const modal = document.getElementById('medicalModal');
+function closeAddDoctorModal() {
+  const modal = document.getElementById('addDoctorModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+  document.getElementById('newDoctorName').value = '';
+  document.getElementById('newDoctorEmail').value = '';
+  document.getElementById('newDoctorPassword').value = '';
+  document.getElementById('newDoctorSpecialization').value = '';
+  document.getElementById('newDoctorPhone').value = '';
+  document.getElementById('newDoctorSchedule').value = '';
+}
+
+function addDoctor() {
+  const newDoctor = {
+    id: Date.now(),
+    name: document.getElementById('newDoctorName').value,
+    email: document.getElementById('newDoctorEmail').value,
+    password: document.getElementById('newDoctorPassword').value,
+    specialization: document.getElementById('newDoctorSpecialization').value,
+    phone: document.getElementById('newDoctorPhone').value,
+    schedule: document.getElementById('newDoctorSchedule').value
+  };
+  
+  if (!newDoctor.name || !newDoctor.email) {
+    showToast('Please fill required fields', 'error');
+    return;
+  }
+  
+  doctors.push(newDoctor);
+  localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+  renderDoctors();
+  closeAddDoctorModal();
+  showToast('Doctor added successfully', 'success');
+}
+
+function editDoctor(id) {
+  const doctor = doctors.find(d => d.id === id);
+  if (!doctor) return;
+  
+  document.getElementById('editDoctorId').value = doctor.id;
+  document.getElementById('editDoctorName').value = doctor.name;
+  document.getElementById('editDoctorEmail').value = doctor.email;
+  document.getElementById('editDoctorSpecialization').value = doctor.specialization || '';
+  document.getElementById('editDoctorPhone').value = doctor.phone || '';
+  document.getElementById('editDoctorSchedule').value = doctor.schedule || '';
+  
+  const modal = document.getElementById('editDoctorModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+function closeEditDoctorModal() {
+  const modal = document.getElementById('editDoctorModal');
   if (modal) {
     modal.classList.remove('show');
     modal.style.display = 'none';
   }
 }
-function closeModal() { closeMedicalModal(); }
 
-async function saveModalMedicalInfo() {
-  const prescriptionText = getPrescriptionText();
-  const ownerEmail = document.getElementById('modalOwnerEmail')?.value || '';
+function updateDoctor() {
+  const id = parseInt(document.getElementById('editDoctorId').value);
+  const index = doctors.findIndex(d => d.id === id);
   
-  const medicalData = {
-    temperature: document.getElementById('modalTemperature')?.value || '',
-    heartRate: document.getElementById('modalHeartRate')?.value || '',
-    respiratoryRate: document.getElementById('modalRespiratory')?.value || '',
-    diagnosis: document.getElementById('modalDiagnosis')?.value || '',
-    clinicalFindings: document.getElementById('modalClinicalFindings')?.value || '',
-    prescription: prescriptionText,
-    treatmentPlan: document.getElementById('modalTreatmentPlan')?.value || '',
-    followUpDate: document.getElementById('modalFollowup')?.value || '',
-    notes: document.getElementById('modalNotes')?.value || '',
-    status: document.getElementById('modalStatus')?.value || 'Confirmed',
-    ownerEmail: ownerEmail,
-    smsReminder: document.getElementById('modalSmsReminder')?.checked || false,
-    emailReminder: document.getElementById('modalEmailReminder')?.checked || false
+  if (index !== -1) {
+    doctors[index] = {
+      ...doctors[index],
+      name: document.getElementById('editDoctorName').value,
+      email: document.getElementById('editDoctorEmail').value,
+      specialization: document.getElementById('editDoctorSpecialization').value,
+      phone: document.getElementById('editDoctorPhone').value,
+      schedule: document.getElementById('editDoctorSchedule').value
+    };
+    
+    const newPassword = document.getElementById('editDoctorPassword').value;
+    if (newPassword) doctors[index].password = newPassword;
+    
+    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+    renderDoctors();
+    closeEditDoctorModal();
+    showToast('Doctor updated successfully', 'success');
+  }
+}
+
+function deleteDoctor(id) {
+  if (confirm('Are you sure you want to delete this doctor?')) {
+    doctors = doctors.filter(d => d.id !== id);
+    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+    renderDoctors();
+    showToast('Doctor deleted successfully', 'success');
+  }
+}
+
+// ============================================
+// SERVICES MANAGEMENT (CRUD)
+// ============================================
+function loadServices() {
+  const stored = localStorage.getItem('clinic_services');
+  if (stored) {
+    services = JSON.parse(stored);
+  } else {
+    services = [
+      { id: 1, name: 'General Checkup', icon: 'fa-stethoscope', desc: 'Complete physical exam & health screening', price: 500, duration: 30 },
+      { id: 2, name: 'Vaccination', icon: 'fa-syringe', desc: 'Core & lifestyle vaccines', price: 800, duration: 20 },
+      { id: 3, name: 'Dental Care', icon: 'fa-tooth', desc: 'Scaling & oral hygiene', price: 1000, duration: 45 }
+    ];
+    localStorage.setItem('clinic_services', JSON.stringify(services));
+  }
+  renderServices();
+}
+
+function renderServices() {
+  const container = document.getElementById('servicesList');
+  if (!container) return;
+  
+  if (services.length === 0) {
+    container.innerHTML = '<div class="empty-state">No services added yet</div>';
+    return;
+  }
+  
+  container.innerHTML = services.map(service => `
+    <div class="history-item">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+        <div>
+          <strong><i class="fas ${service.icon}"></i> ${escapeHtml(service.name)}</strong>
+          <div style="font-size: 0.85rem;">${escapeHtml(service.desc)}</div>
+          <div style="font-size: 0.8rem; color: #64748b;">💰 ৳${service.price} | ⏱️ ${service.duration} min</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-secondary" onclick="editService(${service.id})"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn-danger" onclick="deleteService(${service.id})"><i class="fas fa-trash"></i> Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showAddServiceModal() {
+  const modal = document.getElementById('addServiceModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+function closeAddServiceModal() {
+  const modal = document.getElementById('addServiceModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+function addService() {
+  const newService = {
+    id: Date.now(),
+    name: document.getElementById('newServiceName').value,
+    icon: document.getElementById('newServiceIcon').value || 'fa-stethoscope',
+    desc: document.getElementById('newServiceDesc').value,
+    price: parseInt(document.getElementById('newServicePrice').value) || 0,
+    duration: parseInt(document.getElementById('newServiceDuration').value) || 30
   };
   
-  const saveBtn = document.querySelector('#medicalModal .btn-primary');
-  if (!saveBtn) return;
+  if (!newService.name) {
+    showToast('Please enter service name', 'error');
+    return;
+  }
   
-  const originalText = saveBtn.innerHTML;
-  saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-  saveBtn.disabled = true;
+  services.push(newService);
+  localStorage.setItem('clinic_services', JSON.stringify(services));
+  renderServices();
+  closeAddServiceModal();
+  showToast('Service added successfully', 'success');
+}
+
+function editService(id) {
+  const service = services.find(s => s.id === id);
+  if (!service) return;
   
-  const success = await saveMedicalInfo(currentModalBookingId, medicalData);
+  document.getElementById('editServiceId').value = service.id;
+  document.getElementById('editServiceName').value = service.name;
+  document.getElementById('editServiceIcon').value = service.icon;
+  document.getElementById('editServiceDesc').value = service.desc;
+  document.getElementById('editServicePrice').value = service.price;
+  document.getElementById('editServiceDuration').value = service.duration;
   
-  if (success) {
-    saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
-    setTimeout(() => {
-      saveBtn.innerHTML = originalText;
-      saveBtn.disabled = false;
-    }, 1500);
-    closeMedicalModal();
-    await loadAllData();
-    showToast('✅ Medical information saved successfully!', 'success');
+  const modal = document.getElementById('editServiceModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+function closeEditServiceModal() {
+  const modal = document.getElementById('editServiceModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+function updateService() {
+  const id = parseInt(document.getElementById('editServiceId').value);
+  const index = services.findIndex(s => s.id === id);
+  
+  if (index !== -1) {
+    services[index] = {
+      ...services[index],
+      name: document.getElementById('editServiceName').value,
+      icon: document.getElementById('editServiceIcon').value,
+      desc: document.getElementById('editServiceDesc').value,
+      price: parseInt(document.getElementById('editServicePrice').value) || 0,
+      duration: parseInt(document.getElementById('editServiceDuration').value) || 30
+    };
     
-    if (medicalData.emailReminder && ownerEmail) {
-      sendPrescriptionEmailManual(ownerEmail, medicalData.diagnosis, prescriptionText);
-    }
-  } else {
-    saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error!';
-    setTimeout(() => {
-      saveBtn.innerHTML = originalText;
-      saveBtn.disabled = false;
-    }, 2000);
-    showToast('❌ Error saving medical information', 'error');
+    localStorage.setItem('clinic_services', JSON.stringify(services));
+    renderServices();
+    closeEditServiceModal();
+    showToast('Service updated successfully', 'success');
   }
 }
 
-function sendPrescriptionEmail() {
-  const email = document.getElementById('modalOwnerEmail')?.value;
-  const diagnosis = document.getElementById('modalDiagnosis')?.value;
-  const prescription = getPrescriptionText();
-  if (!email) { showToast('Enter email address', 'error'); return; }
-  sendPrescriptionEmailManual(email, diagnosis, prescription);
-}
-
-function sendPrescriptionEmailManual(email, diagnosis, prescription) {
-  const doctor = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh Tripura';
-  const clinicName = "VET FOR PET CLINIC";
-  const clinicAddress = "PCXR+55F, Titash Road, Dhaka, Bangladesh";
-  const clinicPhone = "01406-779238";
-  const clinicEmergency = "01609-420061";
-  const clinicEmail = "info@vetforpet.com";
-  
-  const subject = `Prescription from ${clinicName}`;
-  const body = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    ${clinicName}
-            Advanced Veterinary Care | Compassion at Heart
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📍 Address: ${clinicAddress}
-📞 Phone: ${clinicPhone} | 🚨 Emergency: ${clinicEmergency}
-✉️ Email: ${clinicEmail}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-                    📋 PRESCRIPTION
-
-👨‍⚕️ Doctor: ${doctor}
-📅 Date: ${getBangladeshDate()}
-
-🔬 DIAGNOSIS:
-${diagnosis || 'As per consultation'}
-
-💊 PRESCRIPTION / MEDICINES:
-${prescription || 'No medicines prescribed'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️ Important Notes:
-• Please follow the prescription as advised
-• Complete the full course of medication
-• Contact us for any side effects or concerns
-• Keep follow-up appointment if scheduled
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Thank you for choosing ${clinicName}
-We wish your pet a speedy recovery! 🐾
-
-© ${new Date().getFullYear()} ${clinicName} | All Rights Reserved
-  `;
-  window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  showToast('Email client opened with company details!', 'success');
-}
-
-function printMedicalInfo() {
-  const pet = document.getElementById('summaryPetName')?.innerHTML.replace(/<[^>]*>/g, '') || 'N/A';
-  const diagnosis = document.getElementById('modalDiagnosis')?.value || 'N/A';
-  const prescription = getPrescriptionText() || 'No medicines prescribed';
-  const temp = document.getElementById('modalTemperature')?.value || '--';
-  const hr = document.getElementById('modalHeartRate')?.value || '--';
-  const resp = document.getElementById('modalRespiratory')?.value || '--';
-  const clinicalFindings = document.getElementById('modalClinicalFindings')?.value || '';
-  const treatmentPlan = document.getElementById('modalTreatmentPlan')?.value || '';
-  const followUp = document.getElementById('modalFollowup')?.value || '';
-  const status = document.getElementById('modalStatus')?.value || 'Confirmed';
-  const doctor = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh Tripura';
-  const owner = document.getElementById('summaryOwner')?.innerText || 'N/A';
-  const token = document.getElementById('summaryToken')?.innerText.replace(/<[^>]*>/g, '') || 'N/A';
-  const symptoms = document.getElementById('modalSymptoms')?.innerText || 'No symptoms recorded';
-  const notes = document.getElementById('modalNotes')?.value || '';
-  
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Medical Record - VET FOR PET CLINIC</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Times New Roman',Arial,sans-serif;padding:40px;background:white}
-.print-container{max-width:800px;margin:0 auto}
-.header{text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #f97316}
-.clinic-name{font-size:28px;font-weight:800;color:#f97316}
-.clinic-tagline{font-size:12px;color:#64748b;margin-bottom:15px}
-.clinic-details{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;font-size:11px;color:#475569;margin-top:10px}
-.doc-title{text-align:center;margin:20px 0}
-.doc-title h2{background:#f97316;color:white;display:inline-block;padding:8px 30px;border-radius:50px;font-size:18px}
-.patient-info{background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:20px;border-left:4px solid #f97316}
-.section-title{background:#f1f5f9;padding:8px 15px;border-radius:8px;font-size:14px;font-weight:700;color:#f97316;margin:15px 0 10px;border-left:3px solid #f97316}
-.vitals-grid{display:flex;gap:20px;margin-bottom:20px}
-.vital-card{background:#f8fafc;padding:10px;border-radius:8px;text-align:center;flex:1;border:1px solid #e2e8f0}
-.vital-label{font-size:11px;color:#64748b;text-transform:uppercase}
-.vital-value{font-size:18px;font-weight:700;color:#f97316}
-.content-box{background:#f8fafc;padding:12px 15px;border-radius:8px;margin-bottom:15px;font-size:13px;border:1px solid #e2e8f0}
-.prescription-box{background:#fef3c7;padding:15px;border-radius:8px;margin-bottom:15px;border-left:3px solid #f97316}
-.prescription-text{white-space:pre-wrap;font-family:monospace;font-size:12px}
-.footer{margin-top:30px;padding-top:20px;text-align:center;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8}
-.signature-box{margin-top:30px;display:flex;justify-content:space-between}
-.signature-line{text-align:center;width:200px}
-.signature-line .line{border-top:1px solid #1e293b;margin-top:40px;padding-top:5px;font-size:11px}
-@media print{body{padding:20px}}
-</style>
-</head>
-<body>
-<div class="print-container">
-<div class="header">
-<div class="clinic-name">🐾 VET FOR PET CLINIC</div>
-<div class="clinic-tagline">Advanced Veterinary Care | Compassion at Heart</div>
-<div class="clinic-details"><div>📍 PCXR+55F, Titash Road, Dhaka, Bangladesh</div><div>📞 01406-779238 | 🚨 01609-420061</div><div>✉️ info@vetforpet.com</div></div></div>
-<div class="doc-title"><h2>🏥 MEDICAL RECORD 🏥</h2></div>
-<div class="patient-info"><strong>🐾 PATIENT INFORMATION</strong><br><br>📌 Pet Name: ${pet}<br>📌 Token ID: ${token}<br>📌 Owner Name: ${owner}<br>📌 Date: ${getBangladeshDate()}</div>
-<div class="section-title">📋 Symptoms / Reason for Visit</div><div class="content-box">${symptoms}</div>
-<div class="section-title">❤️ Vital Signs</div><div class="vitals-grid"><div class="vital-card"><div class="vital-label">🌡️ Temperature</div><div class="vital-value">${temp} °C</div></div><div class="vital-card"><div class="vital-label">💓 Heart Rate</div><div class="vital-value">${hr} bpm</div></div><div class="vital-card"><div class="vital-label">🌬️ Respiratory Rate</div><div class="vital-value">${resp} /min</div></div></div>
-<div class="section-title">🩺 Diagnosis</div><div class="content-box">${diagnosis}</div>
-${clinicalFindings ? `<div class="section-title">🔬 Clinical Findings</div><div class="content-box">${clinicalFindings.replace(/\n/g, '<br>')}</div>` : ''}
-<div class="section-title">💊 Prescription / Medicines</div><div class="prescription-box"><div class="prescription-text">${prescription.replace(/\n/g, '<br>')}</div></div>
-${treatmentPlan ? `<div class="section-title">📝 Treatment Plan</div><div class="content-box">${treatmentPlan.replace(/\n/g, '<br>')}</div>` : ''}
-${followUp ? `<div class="section-title">📅 Follow-up Information</div><div class="content-box"><strong>Next Visit Date:</strong> ${followUp}</div>` : ''}
-${notes ? `<div class="section-title">📝 Additional Notes</div><div class="content-box">${notes.replace(/\n/g, '<br>')}</div>` : ''}
-<div class="section-title">✅ Appointment Status</div><div class="content-box">${status}</div>
-<div class="signature-box"><div class="signature-line"><div class="line">Doctor's Signature</div></div><div class="signature-line"><div class="line">Patient's Signature</div></div></div>
-<div class="footer"><p>This is a computer generated medical record. No signature required for digital copy.</p><p>Generated on: ${new Date().toLocaleString()} | For queries, contact: 01609-420061</p><p>© ${new Date().getFullYear()} VET FOR PET CLINIC | All Rights Reserved</p></div>
-</div>
-</body></html>`);
-  printWindow.document.close();
-  printWindow.print();
+function deleteService(id) {
+  if (confirm('Are you sure you want to delete this service?')) {
+    services = services.filter(s => s.id !== id);
+    localStorage.setItem('clinic_services', JSON.stringify(services));
+    renderServices();
+    showToast('Service deleted successfully', 'success');
+  }
 }
 
 // ============================================
-// PRESCRIPTION FUNCTIONS
+// SETTINGS & CONFIGURATION
 // ============================================
-function loadPrescriptionList(savedPrescription) {
-  const container = document.getElementById('prescriptionList');
-  if (!container) return;
-  container.innerHTML = '';
+function loadSettings() {
+  const settings = JSON.parse(localStorage.getItem('clinic_settings') || '{}');
+  document.getElementById('clinicName').value = settings.clinicName || 'VET FOR PET CLINIC';
+  document.getElementById('clinicAddress').value = settings.clinicAddress || 'Dhaka, Bangladesh';
+  document.getElementById('clinicPhone').value = settings.clinicPhone || '01406-779238';
+  document.getElementById('clinicEmergency').value = settings.clinicEmergency || '01609-420061';
+  document.getElementById('clinicEmail').value = settings.clinicEmail || 'info@vetforpet.com';
+}
+
+function saveSettings() {
+  const settings = {
+    clinicName: document.getElementById('clinicName').value,
+    clinicAddress: document.getElementById('clinicAddress').value,
+    clinicPhone: document.getElementById('clinicPhone').value,
+    clinicEmergency: document.getElementById('clinicEmergency').value,
+    clinicEmail: document.getElementById('clinicEmail').value
+  };
+  localStorage.setItem('clinic_settings', JSON.stringify(settings));
+  showToast('Settings saved successfully', 'success');
+}
+
+function loadSlotConfig() {
+  const defaultConfig = {
+    "Saturday": { start: 9, end: 21 },
+    "Sunday": { start: 9, end: 15 },
+    "Monday": { start: 9, end: 15 },
+    "Tuesday": { start: 9, end: 21 },
+    "Wednesday": { start: 9, end: 15 },
+    "Thursday": { start: 9, end: 15 },
+    "Friday": { start: 9, end: 15 }
+  };
   
-  if (savedPrescription && savedPrescription.trim()) {
-    try {
-      const prescriptions = JSON.parse(savedPrescription);
-      if (Array.isArray(prescriptions) && prescriptions.length) {
-        prescriptions.forEach(pres => {
-          addPrescriptionField(pres.name || '', pres.dosage || '', pres.duration || '');
-        });
-        return;
-      }
-    } catch(e) {
-      const lines = savedPrescription.split('\n');
-      lines.forEach(line => {
-        const cleanLine = line.replace(/^•\s*/, '').trim();
-        if (cleanLine) addPrescriptionField(cleanLine, '', '');
-      });
-    }
-  }
-  if (container.children.length === 0) addPrescriptionField('', '', '');
+  const config = JSON.parse(localStorage.getItem('slot_config') || JSON.stringify(defaultConfig));
+  const container = document.getElementById('slotConfig');
+  if (!container) return;
+  
+  container.innerHTML = Object.entries(config).map(([day, cfg]) => `
+    <div class="slot-item">
+      <label>${day}</label>
+      <input type="number" id="${day}_start" value="${cfg.start}" placeholder="Start" min="0" max="23"> -
+      <input type="number" id="${day}_end" value="${cfg.end}" placeholder="End" min="0" max="23">
+    </div>
+  `).join('');
 }
 
-function addPrescriptionField(medName = '', dosage = '', duration = '') {
-  const container = document.getElementById('prescriptionList');
-  if (!container) return;
-  const div = document.createElement('div');
-  div.className = 'prescription-item';
-  div.innerHTML = `
-    <input type="text" class="clean-input med-name" placeholder="Medicine name" value="${escapeHtml(medName)}">
-    <input type="text" class="clean-input med-dosage" placeholder="Dosage" value="${escapeHtml(dosage)}">
-    <input type="text" class="clean-input med-duration" placeholder="Duration" value="${escapeHtml(duration)}">
-    <button type="button" class="remove-prescription" onclick="removePrescription(this)"><i class="fas fa-trash-alt"></i></button>
-  `;
-  container.appendChild(div);
+function saveSlotConfig() {
+  const newConfig = {};
+  const days = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  
+  days.forEach(day => {
+    newConfig[day] = {
+      start: parseInt(document.getElementById(`${day}_start`).value) || 9,
+      end: parseInt(document.getElementById(`${day}_end`).value) || 17
+    };
+  });
+  
+  localStorage.setItem('slot_config', JSON.stringify(newConfig));
+  showToast('Slot configuration saved successfully', 'success');
 }
 
-function removePrescription(btn) {
-  const container = document.getElementById('prescriptionList');
+function loadPricing() {
+  const pricing = JSON.parse(localStorage.getItem('service_pricing') || '{}');
+  const container = document.getElementById('pricingConfig');
   if (!container) return;
-  if (container.children.length > 1) {
-    btn.closest('.prescription-item').remove();
+  
+  if (services.length > 0) {
+    container.innerHTML = services.map(service => `
+      <div class="slot-item">
+        <label>${escapeHtml(service.name)}</label>
+        <input type="number" id="price_${service.id}" value="${pricing[service.id] || service.price || 500}" placeholder="Price (BDT)">
+      </div>
+    `).join('');
   } else {
-    const item = btn.closest('.prescription-item');
-    if (item) {
-      item.querySelector('.med-name').value = '';
-      item.querySelector('.med-dosage').value = '';
-      item.querySelector('.med-duration').value = '';
-    }
+    container.innerHTML = '<p>Add services first to set pricing</p>';
   }
 }
 
-function getPrescriptionText() {
-  const items = document.querySelectorAll('#prescriptionList .prescription-item');
-  const lines = [];
-  items.forEach(item => {
-    const name = item.querySelector('.med-name')?.value.trim();
-    if (name) {
-      let line = `• ${name}`;
-      const dosage = item.querySelector('.med-dosage')?.value.trim();
-      const duration = item.querySelector('.med-duration')?.value.trim();
-      if (dosage) line += `: ${dosage}`;
-      if (duration) line += ` (${duration})`;
-      lines.push(line);
+function savePricing() {
+  const pricing = {};
+  services.forEach(service => {
+    const priceInput = document.getElementById(`price_${service.id}`);
+    if (priceInput) {
+      pricing[service.id] = parseInt(priceInput.value) || 0;
     }
   });
-  return lines.join('\n');
+  localStorage.setItem('service_pricing', JSON.stringify(pricing));
+  showToast('Pricing saved successfully', 'success');
 }
 
 // ============================================
-// PRINT FUNCTIONS
+// BACKUP & EXPORT
 // ============================================
-function printTodayAppointments() {
-  const date = document.getElementById('todayDatePicker')?.value || getBangladeshDate();
-  const apps = allAppointments.filter(a => a.date === date);
-  if (apps.length === 0) { showToast('No appointments', 'error'); return; }
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Today's Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2>VET FOR PET CLINIC - Appointments for ${date}</h2><table><thead><tr><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead><tbody>${apps.map(a => `<tr><td>${a.time}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td>${a.token}</td><td>${a.status||'Confirmed'}</td></tr>`).join('')}</tbody></table></body></html>`);
-  w.document.close(); w.print();
+function exportToCSV() {
+  if (allAppointments.length === 0) {
+    showToast('No data to export', 'error');
+    return;
+  }
+  
+  let csv = "Date,Time,Token,Pet Name,Pet Age,Weight,Owner Name,Phone,Symptoms,Diagnosis,Prescription,Status\n";
+  allAppointments.forEach(a => {
+    csv += `"${a.date}","${a.time}","${a.token}","${escapeCsv(a.petName)}","${escapeCsv(a.petAge || '')}","${escapeCsv(a.weight || '')}","${escapeCsv(a.ownerName)}","${a.ownerPhone}","${escapeCsv(a.symptoms || '')}","${escapeCsv(a.diagnosis || '')}","${escapeCsv(a.prescription || '')}","${a.status || 'Confirmed'}"\n`;
+  });
+  
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `appointments_${getBangladeshDate()}.csv`;
+  link.click();
+  showToast('CSV exported successfully', 'success');
 }
 
-function printAllAppointments() {
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>All Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2>VET FOR PET CLINIC - All Appointments</h2><p>Generated: ${new Date().toLocaleString()}</p><td><thead><tr><th>Date</th><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead><tbody>${allAppointments.map(a => `<tr><td>${a.date}</td><td>${a.time}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td>${a.token}</td><td>${a.status||'Confirmed'}</td></tr>`).join('')}</tbody></table></body></html>`);
-  w.document.close(); w.print();
+function escapeCsv(str) {
+  if (!str) return '';
+  return str.replace(/"/g, '""');
 }
 
-function printPrescriptions() {
-  const prescriptions = allAppointments.filter(a => a.prescription && a.prescription !== '');
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>Prescriptions - VET FOR PET CLINIC</title><style>body{font-family:Arial;padding:20px}.prescription{border:1px solid #ccc;padding:15px;margin-bottom:20px;border-radius:8px}</style></head><body><h2>🐾 VET FOR PET CLINIC - Prescriptions</h2>${prescriptions.map(a => `<div class="prescription"><h3>${escapeHtml(a.petName)} (${a.token})</h3><p><strong>Date:</strong> ${a.date}</p><p><strong>Diagnosis:</strong> ${escapeHtml(a.diagnosis || 'N/A')}</p><p><strong>Prescription:</strong><br>${escapeHtml(a.prescription)}</p><hr><p>Dr. ${sessionStorage.getItem('doctor_name') || 'Mitesh'}</p></div>`).join('')}</body></html>`);
-  printWindow.document.close(); printWindow.print();
+function backupData() {
+  const backup = {
+    appointments: allAppointments,
+    doctors: doctors,
+    services: services,
+    settings: localStorage.getItem('clinic_settings'),
+    slotConfig: localStorage.getItem('slot_config'),
+    pricing: localStorage.getItem('service_pricing'),
+    date: new Date().toISOString()
+  };
+  
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `vet_clinic_backup_${getBangladeshDate()}.json`;
+  link.click();
+  
+  localStorage.setItem('lastBackup', new Date().toLocaleString());
+  const lastBackupSpan = document.getElementById('lastBackup');
+  if (lastBackupSpan) lastBackupSpan.innerText = new Date().toLocaleString();
+  showToast('Backup downloaded successfully', 'success');
 }
 
-function printDoctorReport() {
-  const total = document.getElementById('reportTotal')?.innerText || '0';
-  const completed = document.getElementById('reportCompleted')?.innerText || '0';
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Doctor Report</title></head><body><h2>VET FOR PET CLINIC - Doctor Performance Report</h2><p><strong>Total Patients:</strong> ${total}</p><p><strong>Completed:</strong> ${completed}</p><p><strong>Generated:</strong> ${new Date().toLocaleString()}</p></body></html>`);
-  w.document.close(); w.print();
+function triggerRestore() {
+  document.getElementById('restoreFile').click();
 }
 
-function editProfile() { showToast('Profile edit coming soon!', 'info'); }
+document.getElementById('restoreFile')?.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const data = JSON.parse(ev.target.result);
+      
+      if (data.appointments) {
+        const bookings = {};
+        data.appointments.forEach(a => {
+          if (!bookings[a.date]) bookings[a.date] = [];
+          bookings[a.date].push(a.timeSlot);
+        });
+        localStorage.setItem('vet_bookings', JSON.stringify(bookings));
+        allAppointments = data.appointments;
+        refreshAllData();
+      }
+      if (data.doctors) {
+        localStorage.setItem('clinic_doctors', JSON.stringify(data.doctors));
+        doctors = data.doctors;
+        renderDoctors();
+      }
+      if (data.services) {
+        localStorage.setItem('clinic_services', JSON.stringify(data.services));
+        services = data.services;
+        renderServices();
+      }
+      if (data.settings) localStorage.setItem('clinic_settings', data.settings);
+      if (data.slotConfig) localStorage.setItem('slot_config', data.slotConfig);
+      if (data.pricing) localStorage.setItem('service_pricing', data.pricing);
+      
+      showToast('Restore successful! Refreshing...', 'success');
+      setTimeout(() => location.reload(), 1500);
+    } catch(err) {
+      showToast('Invalid backup file', 'error');
+    }
+  };
+  reader.readAsText(file);
+});
 
 // ============================================
-// UI CARD GENERATORS
+// REPORTS & CHARTS
 // ============================================
-function createAppointmentCard(app) {
-  const statusClass = app.status === 'Completed' ? 'completed' : (app.status === 'Cancelled' ? 'cancelled' : 'confirmed');
-  return `<div class="appointment-card" onclick="viewAppointment('${app.bookingId}')">
-    <div class="card-header"><span class="token">${app.token}</span><span class="status ${statusClass}">${app.status || 'Confirmed'}</span><small>⏰ ${app.time}</small></div>
-    <div><strong>🐾 ${escapeHtml(app.petName)}</strong> (${escapeHtml(app.petAge||'N/A')})</div>
-    <div><i class="fas fa-user"></i> ${escapeHtml(app.ownerName)} | <i class="fas fa-phone"></i> ${escapeHtml(app.ownerPhone)}</div>
-    <div><strong>Symptoms:</strong> ${escapeHtml(app.symptoms||'N/A')}</div>
-    ${app.diagnosis ? `<div><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis)}</div>` : ''}
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn-primary" onclick="event.stopPropagation(); openMedicalModal('${app.bookingId}')"><i class="fas fa-stethoscope"></i> Medical</button>
-      <button class="btn-print" onclick="event.stopPropagation(); printSingleAppointment('${app.bookingId}')"><i class="fas fa-print"></i> Print</button>
-    </div>
-  </div>`;
+function updateReportStats() {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const weeklyApps = allAppointments.filter(a => new Date(a.date) >= oneWeekAgo);
+  document.getElementById('weeklyCount').innerText = weeklyApps.length;
+  
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  const monthlyApps = allAppointments.filter(a => new Date(a.date) >= oneMonthAgo);
+  document.getElementById('monthlyCount').innerText = monthlyApps.length;
+  
+  const completedApps = allAppointments.filter(a => a.status === 'Completed');
+  document.getElementById('completedReportCount').innerText = completedApps.length;
+  
+  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
+  document.getElementById('totalPetsReportCount').innerText = uniquePets.length;
+  
+  createWeeklyChart();
 }
 
-function createHistoryItem(app) {
-  const statusClass = app.status === 'Completed' ? 'completed' : (app.status === 'Cancelled' ? 'cancelled' : 'confirmed');
-  return `<div class="history-item" onclick="viewAppointment('${app.bookingId}')">
-    <div style="display:flex;justify-content:space-between">
-      <strong>🐾 ${escapeHtml(app.petName)}</strong>
-      <span class="token">${app.token}</span>
-      <span class="status ${statusClass}">${app.status||'Confirmed'}</span>
-    </div>
-    <div>👤 ${escapeHtml(app.ownerName)} | 📞 ${escapeHtml(app.ownerPhone)} | 📅 ${app.date} | ⏰ ${app.time}</div>
-    ${app.diagnosis ? `<div>🩺 ${escapeHtml(app.diagnosis)}</div>` : ''}
-  </div>`;
-}
-
-function printSingleAppointment(bookingId) {
-  const app = allAppointments.find(a => a.bookingId === bookingId);
-  if(!app) return;
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>Appointment - ${app.token}</title><style>body{font-family:Arial;padding:20px}.header{text-align:center}</style></head><body><div class="header"><h2>🐾 VET FOR PET CLINIC</h2><p>PCXR+55F, Titash Road, Dhaka | 📞 01406-779238</p></div><h3>Appointment Details</h3><p><strong>Token:</strong> ${app.token}<br><strong>Date:</strong> ${app.date}<br><strong>Time:</strong> ${app.time}<br><strong>Pet:</strong> ${app.petName}<br><strong>Owner:</strong> ${app.ownerName}<br><strong>Phone:</strong> ${app.ownerPhone}<br><strong>Symptoms:</strong> ${app.symptoms||'N/A'}<br><strong>Diagnosis:</strong> ${app.diagnosis||'N/A'}<br><strong>Prescription:</strong><br>${app.prescription||'N/A'}</p></body></html>`);
-  printWindow.document.close(); printWindow.print();
+function createWeeklyChart() {
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    last7Days.push(date.toISOString().split('T')[0]);
+  }
+  
+  const dailyCounts = last7Days.map(date => allAppointments.filter(a => a.date === date).length);
+  
+  const ctx = document.getElementById('weeklyChart')?.getContext('2d');
+  if (!ctx) return;
+  
+  if (adminChart) adminChart.destroy();
+  
+  adminChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })),
+      datasets: [{
+        label: 'Appointments',
+        data: dailyCounts,
+        backgroundColor: '#f97316',
+        borderRadius: 8
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+  });
 }
 
 // ============================================
 // UTILITIES
 // ============================================
-function escapeHtml(t) { if(!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
-function showToast(msg,type) {
-  const toast = document.getElementById('toast');
-  if (!toast) return;
-  toast.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
-  toast.style.background = type==='success'?'#15803d':'#ef4444';
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
+function showLoading(message) {
+  // Optional loading indicator
+  console.log(message);
 }
-function setupModalClose() {
-  document.querySelectorAll('.close-modal, .close-modal-btn').forEach(btn => {
-    if (btn) btn.onclick = function() { closeMedicalModal(); closeViewModal(); closeLogoutModal(); };
-  });
-  window.onclick = function(e) { if(e.target.classList && e.target.classList.contains('modal')) { closeMedicalModal(); closeViewModal(); closeLogoutModal(); } };
-  document.addEventListener('keydown', e => { if(e.key === 'Escape') { closeMedicalModal(); closeViewModal(); closeLogoutModal(); } });
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
-function showLogoutModal() { const m = document.getElementById('logoutModal'); if(m) { m.classList.add('show'); m.style.display = 'flex'; } }
-function closeLogoutModal() { const m = document.getElementById('logoutModal'); if(m) { m.classList.remove('show'); m.style.display = 'none'; } }
-function confirmLogout() { sessionStorage.clear(); window.location.href = 'doctor-login.html'; }
+
+function showToast(message, type) {
+  let toast = document.querySelector('.toast-notification');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    document.body.appendChild(toast);
+    toast.style.cssText = 'position:fixed;bottom:30px;right:30px;padding:12px 24px;border-radius:50px;color:white;z-index:9999;transition:0.3s';
+  }
+  toast.style.background = type === 'success' ? '#15803d' : '#ef4444';
+  toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+  toast.style.transform = 'translateX(0)';
+  setTimeout(() => toast.style.transform = 'translateX(400px)', 3000);
+}
+
+// Logout functions
+function showLogoutModal() {
+  const modal = document.getElementById('logoutModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+function closeLogoutModal() {
+  const modal = document.getElementById('logoutModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+function confirmLogout() {
+  if (autoSyncInterval) clearInterval(autoSyncInterval);
+  sessionStorage.clear();
+  window.location.href = 'admin-login.html';
+}
