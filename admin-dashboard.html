@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | VET FOR PET</title>
+  <link rel="stylesheet" href="admin-styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<div class="dashboard-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="logo-icon"><i class="fas fa-user-shield"></i></div><h2>ADMIN</h2><span class="role-badge">Super Admin</span></div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+      <a href="#" class="nav-item" data-page="appointments"><i class="fas fa-calendar-check"></i><span>All Appointments</span></a>
+      <a href="#" class="nav-item" data-page="doctors"><i class="fas fa-user-md"></i><span>Manage Doctors</span></a>
+      <a href="#" class="nav-item" data-page="services"><i class="fas fa-stethoscope"></i><span>Services</span></a>
+      <a href="#" class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span>Settings</span></a>
+      <a href="#" class="nav-item" data-page="backup"><i class="fas fa-database"></i><span>Backup</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="admin-info"><div class="admin-avatar"><i class="fas fa-user-cog"></i></div><div><strong id="adminName">Admin</strong><small id="adminRole">Administrator</small></div></div><button class="logout-btn" onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button></div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-dashboard">
+    <header class="dashboard-header"><div class="header-left"><h1 id="pageTitle">Dashboard</h1><p>Welcome back, <span id="welcomeName">Admin</span></p></div><div class="header-right"><div class="date-time-box"><div><i class="fas fa-calendar-alt"></i><span id="currentDate"></span></div><div><i class="fas fa-clock"></i><span id="currentTime"></span></div></div><div class="sync-status" id="syncStatus"><i class="fas fa-check-circle"></i> Synced</div><div onclick="refreshData()" class="refresh-btn"><i class="fas fa-sync-alt"></i></div></div></header>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page-content active">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-today"></i></div><div class="stat-info"><h3 id="totalToday">0</h3><p>Today's Appointments</p></div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-week"></i></div><div class="stat-info"><h3 id="totalWeekly">0</h3><p>This Week</p></div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-month"></i></div><div class="stat-info"><h3 id="totalMonthly">0</h3><p>This Month</p></div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-paw"></i></div><div class="stat-info"><h3 id="totalPets">0</h3><p>Total Pets</p></div></div>
+        <div class="stat-card"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-info"><h3 id="totalCompleted">0</h3><p>Completed</p></div></div>
+      </div>
+      <div class="quick-actions"><h3><i class="fas fa-bolt"></i> Quick Actions</h3><div class="action-buttons"><button onclick="exportToCSV()"><i class="fas fa-file-csv"></i> Export CSV</button><button onclick="backupData()"><i class="fas fa-database"></i> Backup</button><button onclick="refreshData()"><i class="fas fa-sync-alt"></i> Refresh</button></div></div>
+      <div class="recent-section"><div class="section-header"><h3><i class="fas fa-history"></i> Recent Appointments</h3></div><div id="recentAppointments" class="appointments-list"></div></div>
+    </div>
+
+    <!-- All Appointments Page -->
+    <div id="appointmentsPage" class="page-content"><div class="page-header"><h2><i class="fas fa-list"></i> All Appointments</h2><div class="filter-bar"><input type="text" id="filterInput" placeholder="Filter by pet, owner, phone..." onkeyup="filterAppointments()"><button onclick="exportToCSV()" class="btn-export"><i class="fas fa-file-csv"></i> Export CSV</button></div></div><div id="allAppointmentsList" class="appointments-list"></div></div>
+
+    <!-- Manage Doctors Page -->
+    <div id="doctorsPage" class="page-content"><div class="page-header"><h2><i class="fas fa-user-md"></i> Manage Doctors</h2><button onclick="showAddDoctorModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Doctor</button></div><div id="doctorsList" class="doctors-list"></div></div>
+
+    <!-- Services Page -->
+    <div id="servicesPage" class="page-content"><div class="page-header"><h2><i class="fas fa-stethoscope"></i> Manage Services</h2><button onclick="showAddServiceModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Service</button></div><div id="servicesList" class="services-list"></div></div>
+
+    <!-- Settings Page -->
+    <div id="settingsPage" class="page-content"><div class="page-header"><h2><i class="fas fa-cog"></i> System Settings</h2></div><div class="settings-card"><div class="settings-section"><h3>Clinic Information</h3><div class="settings-form"><div class="form-group"><label>Clinic Name</label><input type="text" id="clinicName" class="clean-input"></div><div class="form-group"><label>Address</label><input type="text" id="clinicAddress" class="clean-input"></div><div class="form-group"><label>Phone</label><input type="text" id="clinicPhone" class="clean-input"></div><div class="form-group"><label>Emergency Phone</label><input type="text" id="clinicEmergency" class="clean-input"></div><div class="form-group"><label>Email</label><input type="email" id="clinicEmail" class="clean-input"></div></div><button onclick="saveSettings()" class="btn-primary">Save Settings</button></div><div class="settings-section"><h3>Slot Configuration</h3><div class="slot-config" id="slotConfig"></div><button onclick="saveSlotConfig()" class="btn-primary">Save Slot Config</button></div></div></div>
+
+    <!-- Backup Page -->
+    <div id="backupPage" class="page-content"><div class="page-header"><h2><i class="fas fa-database"></i> Backup & Restore</h2></div><div class="backup-card"><div class="backup-actions"><button onclick="backupData()" class="btn-primary"><i class="fas fa-download"></i> Download Backup</button><button onclick="restoreData()" class="btn-secondary"><i class="fas fa-upload"></i> Restore Backup</button><input type="file" id="restoreFile" style="display:none" accept=".json"></div><div class="backup-info"><p>Last backup: <span id="lastBackup">Never</span></p></div></div></div>
+  </main>
+</div>
+
+<!-- Add Doctor Modal -->
+<div id="addDoctorModal" class="modal"><div class="modal-content small"><div class="modal-header"><h3>Add New Doctor</h3><button class="close-modal" onclick="closeAddDoctorModal()">&times;</button></div><div class="modal-body"><div class="form-group"><label>Name</label><input type="text" id="newDoctorName" class="clean-input"></div><div class="form-group"><label>Email</label><input type="email" id="newDoctorEmail" class="clean-input"></div><div class="form-group"><label>Password</label><input type="password" id="newDoctorPassword" class="clean-input"></div><div class="form-group"><label>Specialization</label><input type="text" id="newDoctorSpecialization" class="clean-input"></div></div><div class="modal-footer"><button class="btn-secondary" onclick="closeAddDoctorModal()">Cancel</button><button class="btn-primary" onclick="addDoctor()">Add Doctor</button></div></div></div>
+
+<!-- Add Service Modal -->
+<div id="addServiceModal" class="modal"><div class="modal-content small"><div class="modal-header"><h3>Add New Service</h3><button class="close-modal" onclick="closeAddServiceModal()">&times;</button></div><div class="modal-body"><div class="form-group"><label>Service Name</label><input type="text" id="newServiceName" class="clean-input"></div><div class="form-group"><label>Icon</label><input type="text" id="newServiceIcon" class="clean-input" placeholder="fa-stethoscope"></div><div class="form-group"><label>Description</label><textarea id="newServiceDesc" rows="2" class="clean-textarea"></textarea></div></div><div class="modal-footer"><button class="btn-secondary" onclick="closeAddServiceModal()">Cancel</button><button class="btn-primary" onclick="addService()">Add Service</button></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="admin-script.js"></script>
+</body>
+</html>

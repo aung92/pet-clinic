@@ -1,224 +1,250 @@
-// Real-time Bangladesh Time & Date
-function updateBangladeshTime() {
-  const timeOptions = { timeZone: 'Asia/Dhaka', hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-  const dateOptions = { timeZone: 'Asia/Dhaka', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+// ============================================
+// VET FOR PET CLINIC - CLIENT SIDE SCRIPT
+// Google Sheets API Integration
+// ============================================
+
+// CONFIGURATION
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
+
+// Slot Configuration (30-min intervals per day)
+const slotConfig = {
+  "Saturday": { start: 9, end: 21 },
+  "Sunday": { start: 9, end: 15 },
+  "Monday": { start: 9, end: 15 },
+  "Tuesday": { start: 9, end: 21 },
+  "Wednesday": { start: 9, end: 15 },
+  "Thursday": { start: 9, end: 15 },
+  "Friday": { start: 9, end: 15 }
+};
+
+// Global variables
+let bookedCache = {};
+let currentDate = null;
+let selectedTime = null;
+let datePicker = null;
+
+// ============================================
+// INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  AOS.init({ duration: 800, once: true });
+  setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 800);
+  updateDateTime();
+  setInterval(updateDateTime, 1000);
+  initializeDatePicker();
+  setupEventListeners();
+  fetchBookings();
+});
+
+// Live Date & Time Update
+function updateDateTime() {
   const now = new Date();
-  const timeElement = document.getElementById('currentTime');
-  const dateElement = document.getElementById('currentDate');
-  if (timeElement) timeElement.textContent = now.toLocaleTimeString('en-US', timeOptions);
-  if (dateElement) dateElement.textContent = now.toLocaleDateString('en-US', dateOptions);
-}
-updateBangladeshTime();
-setInterval(updateBangladeshTime, 1000);
-
-// Developer click handlers
-function openEmailClient() {
-  window.location.href = 'mailto:aungching.jack420@gmail.com?subject=Website%20Development%20Inquiry%20-%20VET%20FOR%20PET%20CLINIC&body=Hello%20Aung%20Ching%2C%0A%0AI%20saw%20your%20work%20on%20the%20VET%20FOR%20PET%20CLINIC%20website.%20I%20would%20like%20to%20discuss%20a%20project...';
+  const dateElem = document.getElementById('currentDate');
+  const timeElem = document.getElementById('currentTime');
+  if (dateElem) dateElem.innerText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (timeElem) timeElem.innerText = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-const devNameBtn = document.getElementById('devNameBtn');
-const hireBtn = document.getElementById('hireBtn');
+// Generate Time Slots based on day
+function generateTimeSlots(dayName) {
+  const cfg = slotConfig[dayName];
+  if (!cfg) return [];
+  const slots = [];
+  let hour = cfg.start, minute = 0;
+  while (hour < cfg.end || (hour === cfg.end && minute === 0)) {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    let displayHour = hour % 12;
+    if (displayHour === 0) displayHour = 12;
+    slots.push(`${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`);
+    minute += 30;
+    if (minute >= 60) { hour++; minute = 0; }
+  }
+  return slots;
+}
 
-if (devNameBtn) devNameBtn.addEventListener('click', openEmailClient);
-if (hireBtn) hireBtn.addEventListener('click', openEmailClient);
+// JSONP Request Helper (CORS bypass)
+function jsonpRequest(url, callbackName, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const callbackFunction = `jsonp_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    window[callbackFunction] = function(data) {
+      delete window[callbackFunction];
+      document.body.removeChild(script);
+      clearTimeout(timer);
+      resolve(data);
+    };
+    const separator = url.includes('?') ? '&' : '?';
+    script.src = `${url}${separator}callback=${callbackFunction}`;
+    const timer = setTimeout(() => {
+      delete window[callbackFunction];
+      document.body.removeChild(script);
+      reject(new Error('JSONP request timeout'));
+    }, timeout);
+    script.onerror = () => {
+      delete window[callbackFunction];
+      document.body.removeChild(script);
+      clearTimeout(timer);
+      reject(new Error('JSONP request failed'));
+    };
+    document.body.appendChild(script);
+  });
+}
 
-// ✅ YOUR GOOGLE SHEETS WEBHOOK URL (Update this after deploy)
-const GOOGLE_SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbzGdDBtcL_v0xs-1e6HmhJ4lWo-sa80s5HhqaSX4VvRH-pOJrSk8W_bodtWvTozTy9_fg/exec";
+// Fetch existing bookings from Google Sheets
+async function fetchBookings() {
+  try {
+    const data = await jsonpRequest(`${SCRIPT_URL}?action=getBookings&t=${Date.now()}`, 'callback');
+    if (data && data.bookings) bookedCache = data.bookings;
+  } catch (error) {
+    console.warn('Fetch error - using localStorage:', error);
+    const local = localStorage.getItem('vet_bookings');
+    if (local) bookedCache = JSON.parse(local);
+  }
+}
 
-const ALL_SLOTS = ["10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM"];
+// Save booking to Google Sheets
+async function saveBookingToSheet(bookingData, token) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addBooking', ...bookingData, token })
+    });
+    if (!bookedCache[bookingData.date]) bookedCache[bookingData.date] = [];
+    bookedCache[bookingData.date].push(bookingData.timeSlot);
+    localStorage.setItem('vet_bookings', JSON.stringify(bookedCache));
+    return true;
+  } catch (error) {
+    if (!bookedCache[bookingData.date]) bookedCache[bookingData.date] = [];
+    bookedCache[bookingData.date].push(bookingData.timeSlot);
+    localStorage.setItem('vet_bookings', JSON.stringify(bookedCache));
+    return true;
+  }
+}
 
-let selectedDate = null, selectedTimeSlot = null;
-
-// Initialize Flatpickr calendar
-const datePickerElement = document.getElementById('datePicker');
-if (datePickerElement) {
-  flatpickr("#datePicker", {
+// Date Picker Initialization
+function initializeDatePicker() {
+  datePicker = flatpickr("#datePicker", {
     dateFormat: "Y-m-d",
     minDate: "today",
-    maxDate: new Date().fp_incr(30),
-    disable: [date => date.getDay() === 0],
-    onChange: (dates, dateStr) => {
-      selectedDate = dateStr;
+    onChange: async (selectedDates, dateStr) => {
+      currentDate = dateStr;
+      const dayName = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long' });
+      const slots = generateTimeSlots(dayName);
+      await fetchBookings();
+      const booked = bookedCache[dateStr] || [];
       const container = document.getElementById('timeSlotsContainer');
-      if (container) {
-        container.innerHTML = '';
-        ALL_SLOTS.forEach(slot => {
-          const div = document.createElement('div');
-          div.className = 'time-slot';
-          div.textContent = slot;
-          div.onclick = () => {
+      container.innerHTML = '';
+      slots.forEach(slot => {
+        const btn = document.createElement('div');
+        const isBooked = booked.includes(slot);
+        btn.className = `time-slot ${isBooked ? 'booked' : 'available'}`;
+        btn.textContent = slot;
+        if (!isBooked) {
+          btn.onclick = () => {
             document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
-            div.classList.add('selected');
-            selectedTimeSlot = slot;
-            const selectedTimeInput = document.getElementById('selectedTime');
-            if (selectedTimeInput) selectedTimeInput.value = slot;
+            btn.classList.add('selected');
+            selectedTime = slot;
+            document.getElementById('selectedSlot').value = slot;
           };
-          container.appendChild(div);
-        });
-      }
-    }
-  });
-}
-
-// Emergency checkbox handler
-const emergencyCheckbox = document.getElementById('emergencyPriority');
-if (emergencyCheckbox) {
-  emergencyCheckbox.addEventListener('change', function(e) {
-    if (e.target.checked && selectedDate) {
-      const firstSlot = document.querySelector('.time-slot:not(.disabled)');
-      if (firstSlot) firstSlot.click();
-    }
-  });
-}
-
-// Form submission
-const form = document.getElementById('appointmentForm');
-const feedbackDiv = document.getElementById('formFeedback');
-
-if (form) {
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('name')?.value.trim() || '';
-    const phone = document.getElementById('phone')?.value.trim() || '';
-    const petType = document.getElementById('petType')?.value || '';
-    const petName = document.getElementById('petName')?.value.trim() || '';
-    const isEmergency = document.getElementById('emergencyPriority')?.checked || false;
-    const symptoms = document.getElementById('symptoms')?.value.trim() || '';
-
-    if (!name || !phone || !petType) {
-      if (feedbackDiv) feedbackDiv.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Please fill all required fields.</div>';
-      return;
-    }
-    if (!selectedDate) {
-      if (feedbackDiv) feedbackDiv.innerHTML = '<div class="error-message"><i class="fas fa-calendar-times"></i> Please select a date.</div>';
-      return;
-    }
-    if (!selectedTimeSlot) {
-      if (feedbackDiv) feedbackDiv.innerHTML = '<div class="error-message"><i class="fas fa-clock"></i> Please select a time slot.</div>';
-      return;
-    }
-    if (!/^[0-9+\-\s()]{8,15}$/.test(phone)) {
-      if (feedbackDiv) feedbackDiv.innerHTML = '<div class="error-message"><i class="fas fa-phone-slash"></i> Enter a valid phone number.</div>';
-      return;
-    }
-
-    const appointmentData = {
-      timestamp: new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }),
-      name: name,
-      phone: phone,
-      petType: petType,
-      petName: petName || 'N/A',
-      date: selectedDate,
-      time: selectedTimeSlot,
-      isEmergency: isEmergency ? 'Yes' : 'No',
-      symptoms: symptoms || 'N/A',
-      status: 'Pending'
-    };
-
-    if (feedbackDiv) feedbackDiv.innerHTML = '<div class="success-message" style="background:#fff0e0;"><i class="fas fa-spinner fa-pulse"></i> Submitting your appointment...</div>';
-
-    let tokenNumber = "Generating...";
-    
-    try {
-      const response = await fetch(GOOGLE_SHEETS_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(appointmentData)
+        }
+        container.appendChild(btn);
       });
-      
-      const result = await response.json();
-      if (result.result === "success") {
-        tokenNumber = result.tokenNumber;
-      } else {
-        // Fallback token
-        var formattedDate = selectedDate.replace(/-/g, '');
-        tokenNumber = "VET-" + formattedDate + "-001";
-      }
-    } catch(error) {
-      console.log('Error:', error);
-      var formattedDate = selectedDate.replace(/-/g, '');
-      tokenNumber = "VET-" + formattedDate + "-001";
+      if (container.children.length === 0) container.innerHTML = '<div class="time-slot booked">No slots available</div>';
     }
-
-    const appointmentDate = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    
-    if (feedbackDiv) {
-      feedbackDiv.innerHTML = `<div class="success-message">
-        <i class="fas fa-check-circle"></i> <strong>Appointment Confirmed! ✅</strong><br><br>
-        🎫 <strong style="font-size: 1.4rem; color: #e07c3c;">Your Token Number: ${tokenNumber}</strong><br><br>
-        📅 <strong>Date:</strong> ${appointmentDate}<br>
-        ⏰ <strong>Time:</strong> ${selectedTimeSlot}<br>
-        🐾 <strong>Pet:</strong> ${petType} ${petName ? '('+petName+')' : ''}<br>
-        👤 <strong>Owner:</strong> ${name}<br>
-        ${isEmergency ? '🚨 <strong>EMERGENCY PRIORITY BOOKING</strong> - Doctor will call you immediately! 🚨<br><br>' : '<br>'}
-        <div style="background: #f0e7da; padding: 12px; border-radius: 20px; margin-top: 10px;">
-          <i class="fas fa-info-circle"></i> <strong>Please Note:</strong><br>
-          ✅ Show this token at reception<br>
-          ✅ Please arrive 10 minutes early<br>
-          ✅ A confirmation SMS has been sent to your phone<br>
-          ✅ For any changes, call us at 01406779238
-        </div>
-      </div>`;
-    }
-    
-    form.reset();
-    const selectedTimeInput = document.getElementById('selectedTime');
-    if (selectedTimeInput) selectedTimeInput.value = '';
-    selectedTimeSlot = null;
-    selectedDate = null;
-    const datePicker = document.getElementById('datePicker');
-    if (datePicker) datePicker.value = '';
-    const timeSlotsContainer = document.getElementById('timeSlotsContainer');
-    if (timeSlotsContainer) timeSlotsContainer.innerHTML = '';
-    if (emergencyCheckbox) emergencyCheckbox.checked = false;
-    
-    if (feedbackDiv) feedbackDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 }
 
-// Loading overlay
-window.addEventListener('load', () => {
-  const overlay = document.getElementById('loadingOverlay');
-  if (overlay) {
-    overlay.classList.add('fade-out');
-    setTimeout(() => overlay.style.display = 'none', 700);
-  }
-});
-
-// Mobile menu toggle
-const menuIcon = document.getElementById('menuIcon');
-const navLinks = document.getElementById('navLinks');
-if (menuIcon) {
-  menuIcon.addEventListener('click', () => {
-    if (navLinks) navLinks.classList.toggle('active');
-  });
+// Show Message
+function showMessage(msg, type) {
+  const div = document.getElementById('formMessage');
+  const bgColor = type === 'error' ? '#fef2f2' : '#f0fdf4';
+  const textColor = type === 'error' ? '#ef4444' : '#15803d';
+  div.innerHTML = `<div style="background:${bgColor};color:${textColor};padding:12px;border-radius:28px;">${msg}</div>`;
+  setTimeout(() => div.innerHTML = '', 3000);
 }
 
-// Smooth scroll
-document.querySelectorAll('.nav-links a').forEach(anchor => {
-  anchor.addEventListener('click', function(e) {
-    const target = this.getAttribute('href');
-    if (target && target.startsWith('#')) {
-      e.preventDefault();
-      const targetElement = document.querySelector(target);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth' });
-        if (navLinks) navLinks.classList.remove('active');
-      }
-    }
-  });
-});
+// Generate Token
+function generateToken() {
+  const timestamp = Date.now().toString().slice(-8);
+  const random = Math.floor(Math.random() * 1000);
+  return `VFP${timestamp}${random}`;
+}
 
-// Scroll to top
-const scrollBtn = document.getElementById('scrollTopBtn');
-window.addEventListener('scroll', () => {
-  if (scrollBtn) {
-    if (window.scrollY > 500) scrollBtn.classList.add('show');
-    else scrollBtn.classList.remove('show');
+// Handle Booking Submit
+async function handleBookingSubmit(e) {
+  e.preventDefault();
+  const petName = document.getElementById('petName').value.trim();
+  const petAge = document.getElementById('petAge').value.trim() || 'N/A';
+  const petWeight = document.getElementById('petWeight').value.trim() || 'N/A';
+  const ownerName = document.getElementById('ownerName').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const symptoms = document.getElementById('symptoms').value.trim();
+  
+  if (!petName || !ownerName || !phone || !symptoms) {
+    showMessage('Please fill all required fields', 'error');
+    return;
   }
-});
-if (scrollBtn) {
-  scrollBtn.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+  if (!currentDate || !selectedTime) {
+    showMessage('Please select date & time slot', 'error');
+    return;
+  }
+  await fetchBookings();
+  if (bookedCache[currentDate]?.includes(selectedTime)) {
+    showMessage('This slot was just booked! Please select another time.', 'error');
+    if (datePicker) datePicker.setDate(currentDate);
+    return;
+  }
+  
+  const token = generateToken();
+  const bookingData = { petName, petAge, petWeight, ownerName, phone, symptoms, date: currentDate, timeSlot: selectedTime, timestamp: new Date().toISOString() };
+  
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+  submitBtn.disabled = true;
+  
+  try {
+    await saveBookingToSheet(bookingData, token);
+    const formattedDate = new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('popupDetails').innerHTML = `<strong>🐾 Pet:</strong> ${petName}<br><strong>👤 Owner:</strong> ${ownerName}<br><strong>📞 Phone:</strong> ${phone}<br><strong>📅 Date:</strong> ${formattedDate}<br><strong>⏰ Time:</strong> ${selectedTime}<br><strong>📝 Symptoms:</strong> ${symptoms}<br><strong>👨‍⚕️ Doctor:</strong> Dr. Mitesh Tripura`;
+    document.getElementById('popupToken').innerHTML = `<strong>🎫 TOKEN:</strong> ${token}`;
+    document.getElementById('successPopup').classList.add('active');
+    document.getElementById('bookingForm').reset();
+    selectedTime = null;
+    currentDate = null;
+    if (datePicker) datePicker.clear();
+    document.getElementById('timeSlotsContainer').innerHTML = '<div class="time-slot">Select a date</div>';
+    await fetchBookings();
+    // Trigger notification for doctor portal
+    localStorage.setItem('doctor_notification_trigger', Date.now().toString());
+  } catch (error) {
+    showMessage('Network error. Please try again.', 'error');
+  } finally {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  }
+}
+
+// Print Appointment
+function printAppointment() { window.print(); }
+
+// Close Popup
+function closePopup() { document.getElementById('successPopup').classList.remove('active'); }
+
+// Event Listeners Setup
+function setupEventListeners() {
+  document.getElementById('bookingForm').addEventListener('submit', handleBookingSubmit);
+  document.getElementById('closePopup').addEventListener('click', closePopup);
+  document.getElementById('printPopupBtn').addEventListener('click', printAppointment);
+  
+  const menuIcon = document.getElementById('menuIcon');
+  const navLinks = document.getElementById('navLinks');
+  if (menuIcon) menuIcon.addEventListener('click', () => navLinks.classList.toggle('active'));
+  document.querySelectorAll('.nav-links a').forEach(link => link.addEventListener('click', () => navLinks.classList.remove('active')));
+  
+  const scrollBtn = document.getElementById('scrollTopBtn');
+  window.addEventListener('scroll', () => scrollBtn.classList.toggle('show', window.scrollY > 500));
+  if (scrollBtn) scrollBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Dashboard | VET FOR PET</title>
+  <link rel="stylesheet" href="doctor-styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+<!-- Logout Confirmation Modal -->
+<div id="logoutModal" class="modal">
+  <div class="modal-content small">
+    <div class="modal-header"><i class="fas fa-sign-out-alt" style="color: #f97316; font-size: 24px;"></i><h3>Confirm Logout</h3><button class="close-modal" onclick="closeLogoutModal()">&times;</button></div>
+    <div class="modal-body"><p>Are you sure you want to logout?</p></div>
+    <div class="modal-footer"><button class="btn-secondary" onclick="closeLogoutModal()">Cancel</button><button class="btn-danger" onclick="confirmLogout()">Logout</button></div>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="logo-icon"><i class="fas fa-user-md"></i></div><h2>DOCTOR</h2><span class="role-badge">Medical Portal</span></div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a>
+      <a href="#" class="nav-item" data-page="today"><i class="fas fa-calendar-day"></i><span>Today's Appointments</span><span class="badge" id="todayBadge">0</span></a>
+      <a href="#" class="nav-item" data-page="all"><i class="fas fa-list"></i><span>All Appointments</span></a>
+      <a href="#" class="nav-item" data-page="search"><i class="fas fa-search"></i><span>Search Patient</span></a>
+      <a href="#" class="nav-item" data-page="prescriptions"><i class="fas fa-prescription-bottle"></i><span>Prescriptions</span></a>
+      <a href="#" class="nav-item" data-page="medical"><i class="fas fa-stethoscope"></i><span>Medical Records</span></a>
+      <a href="#" class="nav-item" data-page="reports"><i class="fas fa-chart-line"></i><span>My Reports</span></a>
+      <a href="#" class="nav-item" data-page="profile"><i class="fas fa-user-circle"></i><span>My Profile</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="doctor-info"><div class="doctor-avatar"><i class="fas fa-user-md"></i></div><div><strong id="doctorName">Dr. Mitesh</strong><small id="doctorRole">Senior Veterinarian</small></div></div>
+      <button class="logout-btn" onclick="showLogoutModal()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-dashboard">
+    <header class="dashboard-header">
+      <div class="header-left"><h1 id="pageTitle">Dashboard</h1><p>Welcome back, <span id="welcomeName">Doctor</span></p></div>
+      <div class="header-right">
+        <div class="date-time-box"><div><i class="fas fa-calendar-alt"></i> <span id="currentDate"></span></div><div><i class="fas fa-clock"></i> <span id="currentTime"></span></div><div><i class="fas fa-globe-asia"></i> <span>BDT</span></div></div>
+        <div class="sync-status" id="syncStatus"><i class="fas fa-check-circle"></i> Synced</div>
+        <div class="refresh-btn" onclick="refreshAllData()"><i class="fas fa-sync-alt"></i></div>
+      </div>
+    </header>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page-content active">
+      <div class="stats-row">
+        <div class="stat-card primary"><div class="stat-icon"><i class="fas fa-calendar-today"></i></div><div class="stat-info"><h3 id="todayStatsCount">0</h3><p>Today's Appointments</p></div></div>
+        <div class="stat-card success"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-info"><h3 id="completedCount">0</h3><p>Completed</p></div></div>
+        <div class="stat-card warning"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-info"><h3 id="pendingCount">0</h3><p>Pending</p></div></div>
+        <div class="stat-card info"><div class="stat-icon"><i class="fas fa-paw"></i></div><div class="stat-info"><h3 id="totalPetsCount">0</h3><p>Pets Treated</p></div></div>
+      </div>
+      <div class="quick-actions"><h3><i class="fas fa-bolt"></i> Quick Actions</h3><div class="action-buttons"><button onclick="goToPage('today')"><i class="fas fa-calendar-plus"></i> Today's Schedule</button><button onclick="goToPage('search')"><i class="fas fa-user-plus"></i> Find Patient</button><button onclick="goToPage('prescriptions')"><i class="fas fa-prescription-bottle"></i> Prescriptions</button><button onclick="refreshAllData()"><i class="fas fa-sync-alt"></i> Refresh</button></div></div>
+      <div class="schedule-preview"><div class="section-header"><h3><i class="fas fa-calendar-day"></i> Today's Schedule</h3><a href="#" onclick="goToPage('today'); return false;">View All →</a></div><div id="todayPreview" class="appointments-list"></div></div>
+      <div class="recent-activity"><div class="section-header"><h3><i class="fas fa-history"></i> Recent Activity</h3></div><div id="recentActivity" class="activity-list"></div></div>
+    </div>
+
+    <!-- Today's Appointments Page -->
+    <div id="todayPage" class="page-content"><div class="page-header"><h2><i class="fas fa-calendar-day"></i> Today's Appointments</h2><div class="date-selector"><input type="date" id="todayDatePicker" class="date-input"><button onclick="loadTodayAppointments()" class="btn-refresh"><i class="fas fa-sync-alt"></i> Refresh</button><button onclick="printTodayAppointments()" class="btn-print"><i class="fas fa-print"></i> Print</button></div></div><div id="todayAppointments" class="appointments-grid"></div></div>
+
+    <!-- All Appointments Page -->
+    <div id="allPage" class="page-content"><div class="page-header"><h2><i class="fas fa-list"></i> All Appointments</h2><div class="filter-bar"><input type="text" id="allFilterInput" placeholder="🔍 Filter by pet, owner or phone..." onkeyup="filterAllAppointments()"><select id="statusFilter" onchange="filterAllAppointments()"><option value="all">All Status</option><option value="Confirmed">Confirmed</option><option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select><button onclick="printAllAppointments()" class="btn-print"><i class="fas fa-print"></i> Print List</button></div></div><div id="allAppointments" class="appointments-list"></div><div class="pagination" id="pagination"></div></div>
+
+    <!-- Search Page -->
+    <div id="searchPage" class="page-content"><div class="page-header"><h2><i class="fas fa-search"></i> Search Patient</h2></div><div class="search-box"><input type="text" id="searchInput" placeholder="Enter pet name, owner name or phone number..."><button onclick="searchPatients()"><i class="fas fa-search"></i> Search</button></div><div id="searchResults" class="appointments-grid"></div></div>
+
+    <!-- Prescriptions Page -->
+    <div id="prescriptionsPage" class="page-content"><div class="page-header"><h2><i class="fas fa-prescription-bottle"></i> My Prescriptions</h2><button onclick="printPrescriptions()" class="btn-print"><i class="fas fa-print"></i> Print All</button></div><div id="prescriptionsList" class="prescriptions-list"></div></div>
+
+    <!-- Medical Records Page -->
+    <div id="medicalPage" class="page-content"><div class="page-header"><h2><i class="fas fa-stethoscope"></i> Medical Records</h2></div><div id="medicalRecordsList" class="medical-records-list"></div></div>
+
+    <!-- Reports Page -->
+    <div id="reportsPage" class="page-content"><div class="page-header"><h2><i class="fas fa-chart-line"></i> My Performance Reports</h2><div class="report-filters"><select id="reportPeriod" onchange="loadDoctorReport()"><option value="weekly">Weekly Report</option><option value="monthly">Monthly Report</option><option value="yearly">Yearly Report</option></select><button onclick="loadDoctorReport()" class="btn-primary">Generate</button><button onclick="printDoctorReport()" class="btn-print"><i class="fas fa-print"></i> Print</button></div></div><div class="stats-grid-small" id="reportStats"><div class="stat-card-small"><span>Total Patients</span><strong id="reportTotal">0</strong></div><div class="stat-card-small"><span>Completed</span><strong id="reportCompleted">0</strong></div><div class="stat-card-small"><span>Cancelled</span><strong id="reportCancelled">0</strong></div></div><canvas id="doctorChart" style="max-height: 300px; margin-top: 30px;"></canvas></div>
+
+    <!-- Profile Page -->
+    <div id="profilePage" class="page-content"><div class="page-header"><h2><i class="fas fa-user-circle"></i> My Profile</h2><button onclick="editProfile()" class="btn-primary"><i class="fas fa-edit"></i> Edit Profile</button></div><div class="profile-card"><div class="profile-avatar"><i class="fas fa-user-md"></i></div><div class="profile-info"><div class="info-row"><label>Full Name:</label><span id="profileName"></span></div><div class="info-row"><label>Email:</label><span id="profileEmail"></span></div><div class="info-row"><label>Role:</label><span id="profileRole"></span></div><div class="info-row"><label>Specialization:</label><span id="profileSpecialization"></span></div><div class="info-row"><label>Joined:</label><span id="profileJoined"></span></div></div></div></div>
+  </main>
+</div>
+
+<!-- View Appointment Modal -->
+<div id="viewAppointmentModal" class="modal"><div class="modal-content medium"><div class="modal-header"><h3><i class="fas fa-file-medical"></i> Appointment Details</h3><button class="close-modal" onclick="closeViewModal()">&times;</button></div><div class="modal-body" id="viewAppointmentDetails"></div><div class="modal-footer"><button class="btn-secondary" onclick="closeViewModal()">Close</button><button class="btn-primary" onclick="openMedicalFromView()"><i class="fas fa-stethoscope"></i> Medical Info</button><button class="btn-print" onclick="printAppointmentFromView()"><i class="fas fa-print"></i> Print</button></div></div></div>
+
+<!-- Medical Info Modal -->
+<div id="medicalModal" class="modal">
+  <div class="modal-content medical-modal">
+    <div class="modal-header"><div class="modal-title"><i class="fas fa-stethoscope"></i><h3>Medical Information</h3></div><button type="button" class="close-modal-btn" onclick="closeMedicalModal()"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="modalBookingId">
+      <div class="patient-summary"><div class="summary-header"><div class="pet-avatar"><i class="fas fa-dog"></i></div><div class="pet-basic-info"><h4 id="summaryPetName">Loading...</h4><div class="pet-meta"><span><i class="fas fa-calendar-alt"></i> <span id="summaryDate"></span></span><span><i class="fas fa-clock"></i> <span id="summaryTime"></span></span></div></div><div class="token-badge" id="summaryToken"></div></div><div class="owner-info-summary"><span><i class="fas fa-user"></i> <span id="summaryOwner"></span></span><span><i class="fas fa-phone"></i> <span id="summaryPhone"></span></span></div></div>
+      <div class="symptoms-box"><div class="section-label"><i class="fas fa-notes-medical"></i> Symptoms / Reason</div><div class="symptoms-content" id="modalSymptoms"></div></div>
+      <div class="medical-form-grid">
+        <div class="form-row"><div class="form-group"><label><i class="fas fa-temperature-high"></i> Temperature (°C)</label><input type="text" id="modalTemperature" class="clean-input" placeholder="e.g., 38.5"></div><div class="form-group"><label><i class="fas fa-heartbeat"></i> Heart Rate (bpm)</label><input type="text" id="modalHeartRate" class="clean-input" placeholder="e.g., 120"></div><div class="form-group"><label><i class="fas fa-lungs"></i> Respiratory Rate</label><input type="text" id="modalRespiratory" class="clean-input" placeholder="e.g., 30"></div></div>
+        <div class="form-row"><div class="form-group full-width"><label><i class="fas fa-stethoscope"></i> Diagnosis</label><textarea id="modalDiagnosis" rows="2" class="clean-textarea" placeholder="Enter diagnosis..."></textarea></div></div>
+        <div class="form-row"><div class="form-group full-width"><label><i class="fas fa-microscope"></i> Clinical Findings</label><textarea id="modalClinicalFindings" rows="2" class="clean-textarea" placeholder="Physical examination findings..."></textarea></div></div>
+        <div class="form-row"><div class="form-group full-width"><label><i class="fas fa-prescription-bottle"></i> Prescription</label><div id="prescriptionList" class="prescription-list"></div><button type="button" class="btn-add-prescription" onclick="addPrescriptionField()"><i class="fas fa-plus-circle"></i> Add Medicine</button></div></div>
+        <div class="form-row"><div class="form-group"><label><i class="fas fa-clinic-medical"></i> Treatment Plan</label><textarea id="modalTreatmentPlan" rows="2" class="clean-textarea" placeholder="Treatment plan / instructions..."></textarea></div><div class="form-group"><label><i class="fas fa-calendar-check"></i> Follow-up Date</label><input type="date" id="modalFollowup" class="clean-input"></div></div>
+        <div class="form-row"><div class="form-group"><label><i class="fas fa-file-alt"></i> Additional Notes</label><textarea id="modalNotes" rows="2" class="clean-textarea" placeholder="Any additional notes..."></textarea></div><div class="form-group"><label><i class="fas fa-flag-checkered"></i> Status</label><select id="modalStatus" class="clean-select"><option>Confirmed</option><option>In Progress</option><option>Completed</option><option>Cancelled</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label><i class="fas fa-envelope"></i> Patient Email</label><input type="email" id="modalOwnerEmail" class="clean-input" placeholder="patient@example.com"></div><div class="form-group"><div class="reminder-options"><label class="checkbox-label"><input type="checkbox" id="modalEmailReminder"> Send Email Reminder</label></div></div></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn-secondary" onclick="closeMedicalModal()"><i class="fas fa-times"></i> Cancel</button><button type="button" class="btn-primary" onclick="saveModalMedicalInfo()"><i class="fas fa-save"></i> Save</button><button type="button" class="btn-print" onclick="printMedicalInfo()"><i class="fas fa-print"></i> Print</button><button type="button" class="btn-email" onclick="sendPrescriptionEmail()"><i class="fas fa-envelope"></i> Email</button></div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast-notification"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="doctor-script.js"></script>
+</body>
+</html>

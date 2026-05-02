@@ -3,259 +3,228 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <meta name="description" content="VET FOR PET CLINIC - Expert veterinary care by Dr. Mitesh Tripura in Dhaka.">
-  <meta name="author" content="Aung Ching">
-  <title>VET FOR PET CLINIC | Dr. Mitesh Tripura</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <title>VET FOR PET CLINIC | Advanced Veterinary Care</title>
+  <!-- ============================================
+       EXTERNAL CSS & FONTS
+  ============================================ -->
   <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 </head>
 <body>
 
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loader">
-    <div class="cat-paw-loader">
-      <i class="fas fa-cat"></i><i class="fas fa-paw"></i><i class="fas fa-cat"></i><i class="fas fa-paw"></i><i class="fas fa-cat"></i>
+<!-- ============================================
+     LOADER ANIMATION
+============================================ -->
+<div id="loader">
+  <div class="loader-content">
+    <div class="loader-paws">
+      <i class="fas fa-paw"></i>
+      <i class="fas fa-paw"></i>
+      <i class="fas fa-paw"></i>
     </div>
-    <p>🐱 Paws & Relax — Loading expert care...</p>
-    <div class="cat-purr"><i class="fas fa-heartbeat"></i> VET FOR PET CLINIC</div>
+    <p>Premium Veterinary Care Loading...</p>
   </div>
 </div>
 
 <div class="main-content">
-  <!-- Top Bar with Bangladesh Time & Date -->
+  <!-- ============================================
+       TOP BAR - DATE, TIME, LOCATION, EMERGENCY
+  ============================================ -->
   <div class="top-bar">
-    <div class="container">
-      <div class="datetime-display">
-        <span><i class="fas fa-calendar-alt"></i> <span id="currentDate">Loading...</span></span>
-        <span><i class="fas fa-clock"></i> <span id="currentTime">--:--:--</span></span>
-        <span><i class="fas fa-map-marker-alt"></i> Dhaka, Bangladesh</span>
+    <div class="container top-bar-container">
+      <div class="top-bar-left">
+        <div class="top-bar-item"><i class="fas fa-calendar-alt"></i><span id="currentDate"></span></div>
+        <div class="top-bar-item"><i class="fas fa-clock"></i><span id="currentTime"></span></div>
       </div>
-      <div class="emergency-contact">
-        <i class="fas fa-phone-alt"></i> 24/7 Emergency: <a href="tel:01609420061">01609 420061</a>
+      <div class="top-bar-right">
+        <div class="top-bar-item"><i class="fas fa-map-marker-alt"></i><span>Dhaka, Bangladesh</span></div>
+        <div class="top-bar-item emergency"><i class="fas fa-phone-alt"></i><span>Emergency: 01609-420061</span></div>
       </div>
     </div>
   </div>
 
+  <!-- ============================================
+       NAVIGATION BAR
+  ============================================ -->
   <div class="navbar">
     <div class="container nav-container">
       <div class="logo">
-        <h1><i class="fas fa-cat"></i> VET FOR PET CLINIC</h1>
-        <p>🐾 DR. MITESH TRIPURA | EXPERT VETERINARY CARE</p>
+        <div class="logo-img"><img src="images/logo.png" alt="Vet For Pet Logo"></div>
+        <h2>VET FOR PET CLINIC</h2>
       </div>
       <div class="menu-icon" id="menuIcon"><i class="fas fa-bars"></i></div>
       <div class="nav-links" id="navLinks">
-        <a href="#home"><i class="fas fa-home"></i> Home</a>
-        <a href="#services"><i class="fas fa-paw"></i> Services</a>
-        <a href="#doctor"><i class="fas fa-user-md"></i> Doctor</a>
-        <a href="#appointment"><i class="fas fa-calendar-alt"></i> Book</a>
-        <a href="#contact"><i class="fas fa-map-marker-alt"></i> Contact</a>
+        <a href="#home" class="active">Home</a>
+        <a href="#services">Services</a>
+        <a href="#booking">Booking</a>
+        <a href="#doctor">Doctors</a>
+        <a href="#map">Location</a>
+        <a href="doctor-login.html" class="doctor-link"><i class="fas fa-user-md"></i> Doctor</a>
+        <a href="admin-login.html" class="admin-link"><i class="fas fa-user-shield"></i> Admin</a>
       </div>
     </div>
   </div>
 
-  <!-- Hero Section -->
+  <!-- ============================================
+       HERO SECTION WITH BUBBLE ANIMATION
+  ============================================ -->
   <section id="home" class="hero">
     <div class="container hero-grid">
-      <div class="hero-content">
-        <div class="hero-badge"><i class="fas fa-cat"></i> Trusted Vet in Dhaka Since 2012</div>
-        <h1>Your Pet Deserves <br>Expert Care</h1>
-        <p class="hero-sub">Trusted care by Dr. Mitesh Tripura. Gentle, modern medicine for cats, dogs & birds.</p>
+      <div class="hero-content" data-aos="fade-right">
+        <div class="hero-badge"><i class="fas fa-heartbeat"></i> Excellence in Pet Care Since 2015</div>
+        <h1>Your Pet Deserves<br>Expert & Loving Care</h1>
+        <p class="hero-desc">At VET FOR PET CLINIC, we blend advanced medical technology with genuine compassion.</p>
         <div class="btn-group">
-          <a href="#appointment" class="btn-primary"><i class="fas fa-calendar-check"></i> Book Appointment</a>
-          <a href="tel:01406779238" class="btn-outline"><i class="fas fa-phone-alt"></i> Call Now</a>
+          <a href="#booking" class="btn-primary"><i class="fas fa-calendar-check"></i> Book Appointment</a>
+          <a href="tel:01406779238" class="btn-outline"><i class="fas fa-phone-alt"></i> Emergency Call</a>
         </div>
       </div>
-      <div class="hero-image">
-        <div class="cat-gallery">
-          <div class="cat-card"><img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop" alt="Cute cat"><p>🐾 Oliver</p></div>
-          <div class="cat-card"><img src="https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=200&h=200&fit=crop" alt="Cute cat"><p>🐾 Luna</p></div>
-          <div class="cat-card"><img src="https://images.unsplash.com/photo-1574158622682-e40e69881006?w=200&h=200&fit=crop" alt="Cute cat"><p>🐾 Simba</p></div>
+      <div class="cat-gallery" data-aos="fade-left">
+        <div class="cat-card bubble-animation bubble-1">
+          <div class="bubble-wrap"><img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop" alt="Happy cat"></div>
+          <p>🐾 Oliver</p>
+        </div>
+        <div class="cat-card bubble-animation bubble-2">
+          <div class="bubble-wrap"><img src="https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=200&h=200&fit=crop" alt="White cat"></div>
+          <p>🐾 Luna</p>
+        </div>
+        <div class="cat-card bubble-animation bubble-3">
+          <div class="bubble-wrap"><img src="https://images.unsplash.com/photo-1574158622682-e40e69881006?w=200&h=200&fit=crop" alt="Tabby cat"></div>
+          <p>🐾 Simba</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Services Section -->
-  <section id="services" class="container" style="padding: 70px 0;">
-    <h2 class="section-title"><i class="fas fa-paw"></i> Our Premium Services</h2>
-    <div class="services-grid">
-      <div class="service-card"><i class="fas fa-stethoscope"></i><h3>General Checkup</h3><p>Complete wellness exams</p></div>
-      <div class="service-card"><i class="fas fa-syringe"></i><h3>Vaccination</h3><p>Core & lifestyle vaccines</p></div>
-      <div class="service-card"><i class="fas fa-kit-medical"></i><h3>Surgery</h3><p>Spay/neuter & soft tissue</p></div>
-      <div class="service-card"><i class="fas fa-cut"></i><h3>Grooming</h3><p>Cat-friendly grooming</p></div>
-      <div class="service-card"><i class="fas fa-ambulance"></i><h3>Emergency</h3><p>24/7 rapid response</p></div>
+  <!-- ============================================
+       SERVICES SECTION
+  ============================================ -->
+  <section id="services" class="services-section">
+    <div class="container">
+      <h2 class="section-title">Comprehensive Veterinary Services</h2>
+      <div class="services-grid">
+        <div class="service-card"><div class="service-icon"><i class="fas fa-stethoscope"></i></div><h3>General Checkup</h3><p>Complete physical exam & health screening</p></div>
+        <div class="service-card"><div class="service-icon"><i class="fas fa-syringe"></i></div><h3>Vaccination</h3><p>Core & lifestyle vaccines</p></div>
+        <div class="service-card"><div class="service-icon"><i class="fas fa-kit-medical"></i></div><h3>Surgery</h3><p>Spay/neuter & soft tissue</p></div>
+        <div class="service-card"><div class="service-icon"><i class="fas fa-tooth"></i></div><h3>Dental Care</h3><p>Scaling & oral hygiene</p></div>
+        <div class="service-card"><div class="service-icon"><i class="fas fa-cut"></i></div><h3>Grooming</h3><p>Premium spa & styling</p></div>
+        <div class="service-card"><div class="service-icon"><i class="fas fa-ambulance"></i></div><h3>Emergency 24/7</h3><p>Critical care & trauma</p></div>
+      </div>
     </div>
   </section>
 
-  <!-- Doctor Section -->
+  <!-- ============================================
+       STATS SECTION
+  ============================================ -->
+  <section class="stats-section">
+    <div class="container"><div class="stats-grid">
+      <div class="stat-item"><h3>5000+</h3><p>Happy Pets Treated</p></div>
+      <div class="stat-item"><h3>12+</h3><p>Years Experience</p></div>
+      <div class="stat-item"><h3>4.9★</h3><p>Google Rating</p></div>
+      <div class="stat-item"><h3>24/7</h3><p>Emergency Support</p></div>
+    </div></div>
+  </section>
+
+  <!-- ============================================
+       DOCTOR SECTION
+  ============================================ -->
   <section id="doctor" class="doctor-section">
     <div class="container doctor-flex">
-      <div class="doctor-img">
-        <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=400&fit=crop" alt="Dr. Mitesh Tripura">
-      </div>
+      <div class="doctor-img"><img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&h=400&fit=crop" alt="Dr. Mitesh"></div>
       <div class="doctor-info">
-        <h2><i class="fas fa-user-md"></i> Dr. Mitesh Tripura</h2>
-        <div class="doctor-title">BVSc & AH, MVSc (Surgery) | 12+ Years Experience</div>
-        <p class="doctor-bio">Dr. Mitesh Tripura is a highly skilled veterinarian with over a decade of experience in advanced pet medicine. He specializes in feline behavior, soft tissue surgery, and emergency critical care.</p>
-        <div class="badge-list">
-          <span class="badge"><i class="fas fa-trophy"></i> Best Vet 2024</span>
-          <span class="badge"><i class="fas fa-star"></i> 4.9 Star Rated</span>
-          <span class="badge"><i class="fas fa-cat"></i> Cat Friendly</span>
-        </div>
-        <p><i class="fas fa-clock"></i> Available: 10:00 AM – 10:00 PM (Emergency on-call 24/7)</p>
+        <h2><i class="fas fa-user-md"></i> Dr. Mitesh</h2>
+        <div class="doctor-title">BVSc & AH | Senior Veterinary Surgeon</div>
+        <p class="doctor-bio">Dr. Mitesh brings over 12 years of specialized experience in small animal medicine and surgery.</p>
+        <div class="badge-list"><span class="badge"><i class="fas fa-trophy"></i> Top Veterinarian 2024</span><span class="badge"><i class="fas fa-heart"></i> Fear Free Certified</span><span class="badge"><i class="fas fa-stethoscope"></i> Surgery Specialist</span></div>
+        <p><i class="fas fa-calendar-alt"></i> <strong>Availability:</strong> Sat-Tue (9AM–9PM) | Wed-Fri (9AM–3PM)</p>
       </div>
     </div>
   </section>
 
-  <!-- Why Choose Us -->
-  <section class="container" style="padding: 70px 0;">
-    <h2 class="section-title"><i class="fas fa-heart"></i> Why Choose VET FOR PET CLINIC</h2>
-    <div class="why-grid">
-      <div class="why-item"><i class="fas fa-user-md"></i><h3>Experienced Vet</h3><p>12+ years of expertise</p></div>
-      <div class="why-item"><i class="fas fa-clock"></i><h3>24/7 Emergency</h3><p>Always available for you</p></div>
-      <div class="why-item"><i class="fas fa-dollar-sign"></i><h3>Affordable Care</h3><p>Clear pricing & plans</p></div>
-      <div class="why-item"><i class="fas fa-smile"></i><h3>Friendly Environment</h3><p>Stress-free visits</p></div>
-    </div>
-  </section>
-
-  <!-- Appointment Section -->
-  <section id="appointment" class="appointment-section">
+  <!-- ============================================
+       BOOKING FORM SECTION
+  ============================================ -->
+  <section id="booking" class="booking-section">
     <div class="container">
-      <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Book an Appointment</h2>
+      <h2 class="section-title">Schedule an Appointment</h2>
       <div class="form-card">
-        <form id="appointmentForm">
+        <form id="bookingForm">
           <div class="form-row">
-            <div class="form-group"><input type="text" id="name" placeholder="Full Name *" required></div>
-            <div class="form-group"><input type="tel" id="phone" placeholder="Phone Number *" required></div>
+            <div class="form-group"><label>🐾 Pet Name <span style="color:#ef4444;">*</span></label><input type="text" id="petName" placeholder="Enter your pet's name" required></div>
+            <div class="form-group"><label>📅 Pet Age</label><input type="text" id="petAge" placeholder="e.g., 2 years"></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <select id="petType" required>
-                <option value="">Select Pet Type *</option>
-                <option>Cat</option><option>Dog</option><option>Bird</option><option>Rabbit</option><option>Other</option>
-              </select>
-            </div>
-            <div class="form-group"><input type="text" id="petName" placeholder="Pet Name (optional)"></div>
+            <div class="form-group"><label>⚖️ Weight (kg)</label><input type="text" id="petWeight" placeholder="e.g., 4.5"></div>
+            <div class="form-group"><label>👤 Owner Name <span style="color:#ef4444;">*</span></label><input type="text" id="ownerName" placeholder="Your full name" required></div>
           </div>
-          <div class="form-group">
-            <label><i class="fas fa-calendar-day"></i> Select Date</label>
-            <input type="text" id="datePicker" placeholder="Choose a date" readonly>
-          </div>
-          <div class="form-group">
-            <label><i class="fas fa-clock"></i> Available Time Slots</label>
-            <div id="timeSlotsContainer" class="time-slots"></div>
-            <input type="hidden" id="selectedTime" value="">
-          </div>
-          <div class="form-group">
-            <label class="emergency-checkbox">
-              <input type="checkbox" id="emergencyPriority">
-              <span><i class="fas fa-ambulance" style="color: #dc2626;"></i> 🚨 Emergency Case (Priority Booking)</span>
-            </label>
-          </div>
-          <div class="form-group"><textarea id="symptoms" rows="2" placeholder="Symptoms / Special notes"></textarea></div>
-          <button type="submit" class="btn-primary" style="width:100%"><i class="fas fa-check-circle"></i> Confirm Booking</button>
-          <div id="formFeedback"></div>
+          <div class="form-group"><label>📞 Phone Number <span style="color:#ef4444;">*</span></label><input type="tel" id="phone" placeholder="01XXXXXXXXX" required></div>
+          <div class="form-group"><label>📝 Symptoms / Reason <span style="color:#ef4444;">*</span></label><textarea id="symptoms" rows="2" placeholder="Describe your pet's condition" required></textarea></div>
+          <div class="form-group"><label>📅 Select Date <span style="color:#ef4444;">*</span></label><input type="text" id="datePicker" placeholder="Click to select date" readonly style="cursor:pointer;"></div>
+          <div class="form-group"><label>⏰ Available Time Slots</label><div id="timeSlotsContainer" class="time-slots"><div class="time-slot">Select a date first</div></div><input type="hidden" id="selectedSlot"></div>
+          <div id="formMessage"></div>
+          <button type="submit" class="btn-primary"><i class="fas fa-check-circle"></i> Confirm & Get Token</button>
         </form>
       </div>
     </div>
   </section>
 
-  <!-- Google Map -->
-  <section class="map-section">
+  <!-- ============================================
+       MAP SECTION
+  ============================================ -->
+  <section id="map" class="map-section">
     <div class="container">
-      <h2 class="section-title"><i class="fas fa-map-marker-alt"></i> Our Location</h2>
-      <div class="map-container">
-        <iframe width="100%" height="100%" frameborder="0" style="border:0; min-height: 380px;" loading="lazy" src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d14610.473509283289!2d90.4404296!3d23.7479322!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755b9001d8a57b7%3A0xb2d3ccfcaba9224d!2sVET%20FOR%20PET%20CLINIC!5e0!3m2!1sen!2sbd!4v1746000000000!5m2!1sen!2sbd"></iframe>
-      </div>
+      <h2 class="section-title">Find Us Here</h2>
+      <div class="map-container"><iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3652.618!2d90.438!3d23.748!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3755b8b3b3b3b3b3%3A0x0!2zMjPCsDQ0JzUyLjgiTiA5MMKwMjYnMjAuOCJF!5e0!3m2!1sen!2sbd!4v1700000000000!5m2!1sen!2sbd" allowfullscreen="" loading="lazy"></iframe></div>
+      <div class="map-btn-container"><a href="https://maps.google.com/?q=PCXR+55F+Titash+Rd+Dhaka" target="_blank" class="directions-btn"><i class="fas fa-directions"></i> Get Directions</a></div>
     </div>
   </section>
 
-  <!-- Emergency Banner -->
-  <div class="emergency-banner">
-    <div class="container">
-      <h3><i class="fas fa-ambulance"></i> Emergency? We're here 24/7 for your pet</h3>
-      <a href="tel:01609420061" class="btn-primary" style="margin-top: 18px;"><i class="fas fa-phone"></i> Call Emergency: 01609 420061</a>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <footer class="footer" id="contact">
+  <!-- ============================================
+       FOOTER
+  ============================================ -->
+  <footer class="footer">
     <div class="container">
       <div class="footer-grid">
-        <div class="footer-col">
-          <h3><i class="fas fa-cat"></i> VET FOR PET</h3>
-          <p><i class="fas fa-map-marker-alt"></i> PCXR+55F, Titash Rd, Dhaka, Bangladesh</p>
-          <p><i class="fas fa-phone-alt"></i> <a href="tel:01406779238">01406-779238</a></p>
-          <p><i class="fas fa-phone-alt"></i> <a href="tel:01609420061">01609-420061</a></p>
-          <p><i class="fas fa-envelope"></i> <a href="mailto:info@vetforpet.com">info@vetforpet.com</a></p>
-        </div>
-        <div class="footer-col">
-          <h3><i class="fas fa-clock"></i> Opening Hours</h3>
-          <div class="footer-hours">
-            <p><i class="fas fa-calendar-day"></i> Saturday - Thursday</p>
-            <p><strong>10:00 AM – 10:00 PM</strong></p>
-            <p><i class="fas fa-calendar-times"></i> Friday (Jummah Break)</p>
-            <p><small><i class="fas fa-ambulance"></i> Emergency: 24/7 Available</small></p>
-          </div>
-        </div>
-        <div class="footer-col">
-          <h3><i class="fas fa-link"></i> Quick Links</h3>
-          <ul class="footer-links">
-            <li><a href="#home"><i class="fas fa-angle-right"></i> Home</a></li>
-            <li><a href="#services"><i class="fas fa-angle-right"></i> Our Services</a></li>
-            <li><a href="#doctor"><i class="fas fa-angle-right"></i> Meet the Doctor</a></li>
-            <li><a href="#appointment"><i class="fas fa-angle-right"></i> Book Appointment</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h3><i class="fas fa-share-alt"></i> Connect With Us</h3>
-          <p>Follow us for pet care tips & updates</p>
-          <div class="social-links">
-            <a href="#" target="_blank"><i class="fab fa-facebook-f"></i></a>
-            <a href="#" target="_blank"><i class="fab fa-instagram"></i></a>
-            <a href="https://wa.me/8801406779238" target="_blank"><i class="fab fa-whatsapp"></i></a>
-            <a href="#" target="_blank"><i class="fab fa-google"></i></a>
-          </div>
-          <div style="margin-top: 25px;">
-            <p><i class="fas fa-star-of-life"></i> Trusted by 5000+ pets</p>
-            <p><i class="fas fa-award"></i> Best Vet Clinic 2024</p>
-          </div>
-        </div>
+        <div><h3>VET FOR PET CLINIC</h3><p><i class="fas fa-map-marker-alt"></i> Dhaka, Bangladesh</p><p><i class="fas fa-phone"></i> <a href="tel:01406779238">01406-779238</a></p><p><i class="fas fa-phone-alt"></i> <a href="tel:01609420061">01609-420061 (Emergency)</a></p><p><i class="fas fa-envelope"></i> <a href="mailto:info@vetforpet.com">info@vetforpet.com</a></p></div>
+        <div><h3>Opening Hours</h3><p>Sat-Tue: 9AM–9PM</p><p>Wed-Fri: 9AM–3PM</p><p>Emergency: 24/7</p></div>
+        <div><h3>Quick Links</h3><p><a href="#home">Home</a></p><p><a href="#services">Services</a></p><p><a href="#booking">Book Appointment</a></p><p><a href="#doctor">Our Doctors</a></p><p><a href="doctor-login.html">Doctor Portal</a></p><p><a href="admin-login.html">Admin Portal</a></p></div>
+        <div><h3>Connect</h3><div class="social-icons"><i class="fab fa-facebook"></i><i class="fab fa-instagram"></i><i class="fab fa-whatsapp"></i></div></div>
       </div>
-      
-      <div class="footer-bottom">
-        <div class="footer-credits">
-          <div class="credit-line">
-            <span class="copyright-text"><i class="far fa-copyright"></i> 2025 VET FOR PET CLINIC. All rights reserved. | Dr. Mitesh Tripura</span>
-          </div>
-          <span class="separator">|</span>
-          <div class="credit-line">
-            <div class="dev-name" id="devNameBtn">
-              <i class="fas fa-laptop-code"></i>
-              <span>Developed by <strong>Aung Ching</strong></span>
-              <i class="fas fa-envelope"></i>
-            </div>
-          </div>
-          <span class="separator">|</span>
-          <div class="credit-line">
-            <div class="hire-link" id="hireBtn">
-              <i class="fas fa-envelope-open-text"></i>
-              <span>📩 Click to hire</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div class="footer-bottom"><div class="copyright">&copy; 2025 VET FOR PET CLINIC. All rights reserved.</div></div>
+      <div class="developer-credit"><p>Developed by <a href="mailto:aungching.jack420@gmail.com"><strong>Aung Ching</strong></a></p></div>
     </div>
   </footer>
 
-  <a href="https://wa.me/8801406779238" target="_blank" class="floating-wa"><i class="fab fa-whatsapp"></i></a>
+  <!-- ============================================
+       FLOATING BUTTONS
+  ============================================ -->
+  <a href="https://wa.me/8801406779238" class="floating-wa"><i class="fab fa-whatsapp"></i></a>
   <a href="tel:01609420061" class="floating-call"><i class="fas fa-phone-alt"></i></a>
   <div class="scroll-top" id="scrollTopBtn"><i class="fas fa-arrow-up"></i></div>
+
+  <!-- ============================================
+       SUCCESS POPUP MODAL
+  ============================================ -->
+  <div id="successPopup" class="popup-modal">
+    <div class="popup-content">
+      <div class="clinic-header"><i class="fas fa-clinic-medical" style="font-size:48px; color:var(--primary);"></i><h2>VET FOR PET CLINIC</h2><p>Dhaka, Bangladesh | 📞 01406-779238</p><div class="divider"></div></div>
+      <i class="fas fa-check-circle" style="font-size:48px; color:#15803d;"></i>
+      <h3>Appointment Confirmed!</h3>
+      <div id="popupDetails"></div>
+      <div id="popupToken" class="token-badge"></div>
+      <div class="modal-buttons"><button id="printPopupBtn" class="print-btn"><i class="fas fa-print"></i> Print</button><button id="closePopup" class="close-modal-btn">Close</button></div>
+    </div>
+  </div>
 </div>
 
+<!-- ============================================
+     SCRIPTS
+============================================ -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
