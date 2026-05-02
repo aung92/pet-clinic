@@ -1,52 +1,208 @@
 // ============================================
 // ADMIN DASHBOARD - COMPLETE SCRIPT
-// Modern Edit Sections | Dynamic Popups | A to Z
+// Role Based Access | Full Permissions Control
+// Version: 2.1 | Fixed Delete Issue | Last Updated: 2025
 // ============================================
 
+// ============================================
+// SECTION 1: CONFIGURATION & GLOBAL VARIABLES
+// ============================================
+
+// Google Apps Script URL for backend API
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
 
-let allAppointments = [];
-let doctors = [];
-let services = [];
-let currentPage = 1;
-let itemsPerPage = 20;
-let adminChart = null;
-let autoSyncInterval = null;
+// Global state variables
+let allAppointments = [];      // All appointments data
+let doctors = [];              // List of doctors
+let services = [];             // List of services
+let users = [];                // List of system users
+let permissions = [];          // Role permissions configuration
+let currentPage = 1;           // Current page for pagination
+let itemsPerPage = 20;         // Number of items per page
+let adminChart = null;         // Chart.js instance for reports
+let autoSyncInterval = null;    // Auto sync interval ID
+let currentUserRole = '';       // Current logged in user role
+let currentUserPermissions = []; // Current user permissions array
 
 // ============================================
-// BANGLADESH TIME ZONE
+// SECTION 2: PERMISSION CHECK FUNCTIONS
 // ============================================
+
+/**
+ * Check if current user has specific permission
+ * @param {string} permission - Permission to check
+ * @returns {boolean} True if user has permission
+ */
+function hasPermission(permission) {
+  if (currentUserRole === 'super_admin') return true;
+  return currentUserPermissions.includes(permission);
+}
+
+/**
+ * Check permission and execute callback or show denied modal
+ * @param {string} permission - Required permission
+ * @param {Function} callback - Function to execute if permission granted
+ * @returns {boolean} True if permission granted
+ */
+function checkPermissionAndRedirect(permission, callback) {
+  if (hasPermission(permission)) {
+    if (callback) callback();
+    return true;
+  } else {
+    showPermissionDenied();
+    return false;
+  }
+}
+
+/**
+ * Show permission denied modal
+ */
+function showPermissionDenied() {
+  const modal = document.getElementById('permissionDeniedModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      if (modal.classList.contains('show')) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+      }
+    }, 2000);
+  }
+}
+
+/**
+ * Close permission denied modal
+ */
+function closePermissionModal() {
+  const modal = document.getElementById('permissionDeniedModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+/**
+ * Show toast notification message
+ * @param {string} message - Message to display
+ * @param {string} type - Message type ('success' or 'error')
+ */
+function showToast(message, type) {
+  const toastId = type === 'success' ? 'successToast' : 'errorToast';
+  let toast = document.getElementById(toastId);
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast-notification ' + type;
+    document.body.appendChild(toast);
+  }
+  const msgSpan = toast.querySelector('span');
+  if (msgSpan) {
+    msgSpan.innerText = message;
+  } else {
+    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> <span>${message}</span>`;
+  }
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+}
+
+// ============================================
+// SECTION 3: LOAD USER PERMISSIONS
+// ============================================
+
+/**
+ * Load user permissions based on role from sessionStorage
+ */
+function loadUserPermissions() {
+  currentUserRole = sessionStorage.getItem('admin_role') || 'super_admin';
+  const permissionsStr = sessionStorage.getItem('admin_permissions') || '';
+  currentUserPermissions = permissionsStr === 'full' ? 
+    ['full', 'view_appointments', 'add_appointments', 'edit_appointments', 'manage_doctors', 'manage_services', 'reports'] : 
+    permissionsStr.split(',');
+  
+  // Apply UI restrictions based on permissions
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const requiredPerm = item.getAttribute('data-permission');
+    if (requiredPerm && requiredPerm !== 'full') {
+      if (!hasPermission(requiredPerm) && currentUserRole !== 'super_admin') {
+        item.classList.add('disabled');
+        item.style.pointerEvents = 'none';
+        item.style.opacity = '0.5';
+      } else {
+        item.classList.remove('disabled');
+        item.style.pointerEvents = 'auto';
+        item.style.opacity = '1';
+      }
+    }
+  });
+  
+  const userRoleBadge = document.getElementById('userRoleBadge');
+  if (userRoleBadge) {
+    userRoleBadge.innerText = currentUserRole === 'super_admin' ? 'Super Admin' : 
+                              (currentUserRole === 'manager' ? 'Manager' : 'Receptionist');
+  }
+}
+
+// ============================================
+// SECTION 4: BANGLADESH TIME ZONE (UTC+6)
+// ============================================
+
+/**
+ * Get current time in Bangladesh Time Zone (UTC+6)
+ * @returns {Date} Current date and time in Bangladesh
+ */
 function getBangladeshTime() {
   const now = new Date();
   return new Date(now.getTime() + (6 * 60 * 60 * 1000));
 }
 
+/**
+ * Get current date in Bangladesh Time Zone formatted as YYYY-MM-DD
+ * @returns {string} Formatted date string
+ */
 function getBangladeshDate() {
   const bdTime = getBangladeshTime();
   return `${bdTime.getFullYear()}-${String(bdTime.getMonth() + 1).padStart(2, '0')}-${String(bdTime.getDate()).padStart(2, '0')}`;
 }
 
 // ============================================
-// AUTHENTICATION CHECK
+// SECTION 5: AUTHENTICATION CHECK
 // ============================================
+
+/**
+ * Check if admin is logged in, redirect to login page if not
+ */
 (function() {
   if (!sessionStorage.getItem('admin_logged_in')) {
     window.location.href = 'admin-login.html';
     return;
   }
+  loadUserPermissions();
+  
   const adminName = sessionStorage.getItem('admin_name') || 'Admin';
   const adminRole = sessionStorage.getItem('admin_role') || 'Administrator';
+  
   const welcomeName = document.getElementById('welcomeName');
   const adminNameSpan = document.getElementById('adminName');
   const adminRoleSpan = document.getElementById('adminRole');
+  
   if (welcomeName) welcomeName.innerText = adminName;
   if (adminNameSpan) adminNameSpan.innerText = adminName;
-  if (adminRoleSpan) adminRoleSpan.innerText = adminRole;
+  if (adminRoleSpan) adminRoleSpan.innerText = adminRole === 'super_admin' ? 'Super Admin' : (adminRole === 'manager' ? 'Manager' : 'Receptionist');
+  
+  loadUsers();
+  loadPermissionsConfig();
 })();
 
 // ============================================
-// INITIALIZATION
+// SECTION 6: INITIALIZATION
 // ============================================
+
+/**
+ * Main initialization function - runs when page loads
+ */
 document.addEventListener('DOMContentLoaded', function() {
   updateDateTime();
   setInterval(updateDateTime, 1000);
@@ -66,6 +222,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (reportDate) reportDate.value = getBangladeshDate();
 });
 
+/**
+ * Update date and time display in header
+ */
 function updateDateTime() {
   const bdTime = getBangladeshTime();
   const dateElem = document.getElementById('currentDate');
@@ -75,14 +234,22 @@ function updateDateTime() {
 }
 
 // ============================================
-// AUTO SYNC
+// SECTION 7: AUTO SYNC FUNCTION
 // ============================================
+
+/**
+ * Start auto sync interval (every 15 seconds)
+ */
 function startAutoSync() {
   if (autoSyncInterval) clearInterval(autoSyncInterval);
   autoSyncInterval = setInterval(autoSyncData, 15000);
 }
 
+/**
+ * Auto sync data from Google Sheets API
+ */
 async function autoSyncData() {
+  if (!hasPermission('view_appointments')) return;
   try {
     const response = await fetch(`${SCRIPT_URL}?action=getAppointments&t=${Date.now()}`);
     const text = await response.text();
@@ -110,15 +277,31 @@ async function autoSyncData() {
   } catch (error) { console.error('Auto sync error:', error); }
 }
 
-function refreshAllData() { autoSyncData(); loadDoctors(); loadServices(); showToast('Data refreshed!', 'success'); }
+/**
+ * Refresh all data manually
+ */
+function refreshAllData() { 
+  autoSyncData(); 
+  loadDoctors(); 
+  loadServices(); 
+  showToast('Data refreshed successfully!', 'success'); 
+}
 
 // ============================================
-// NAVIGATION
+// SECTION 8: NAVIGATION
 // ============================================
+
+/**
+ * Setup sidebar navigation event listeners
+ */
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
+      if (item.classList.contains('disabled')) {
+        showPermissionDenied();
+        return;
+      }
       const page = item.getAttribute('data-page');
       document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
       item.classList.add('active');
@@ -129,22 +312,37 @@ function setupNavigation() {
       if (pageTitle) pageTitle.innerText = item.querySelector('span')?.innerText || page;
       if (page === 'appointments') loadAllAppointmentsList();
       if (page === 'reports') { updateReportStats(); createWeeklyChart(); loadReport(); }
+      if (page === 'permissions') loadPermissionsUI();
     });
   });
 }
 
+/**
+ * Navigate to specific page by ID
+ * @param {string} pageId - ID of the page to navigate to
+ */
 function goToPage(pageId) {
   const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-  if (navItem) navItem.click();
+  if (navItem && !navItem.classList.contains('disabled')) navItem.click();
+  else showPermissionDenied();
 }
 
 // ============================================
-// API CALLS
+// SECTION 9: API CALLS
 // ============================================
+
+/**
+ * Fetch data from Google Apps Script API
+ * @param {string} action - API action name
+ * @param {Object} params - Additional parameters
+ * @returns {Promise<Object>} API response
+ */
 async function fetchFromAPI(action, params = {}) {
   try {
     let url = `${SCRIPT_URL}?action=${action}&t=${Date.now()}`;
-    if (action === 'getClientBookings' && params.phone) url += `&phone=${encodeURIComponent(params.phone)}`;
+    if (action === 'getClientBookings' && params.phone) {
+      url += `&phone=${encodeURIComponent(params.phone)}`;
+    }
     const response = await fetch(url);
     const text = await response.text();
     const jsonStr = text.match(/\((.*)\)/)[1];
@@ -153,9 +351,14 @@ async function fetchFromAPI(action, params = {}) {
 }
 
 // ============================================
-// LOAD APPOINTMENTS
+// SECTION 10: LOAD APPOINTMENTS DATA
 // ============================================
+
+/**
+ * Load all appointment data from API
+ */
 async function loadAllData() {
+  if (!hasPermission('view_appointments')) return;
   const data = await fetchFromAPI('getAppointments');
   if (data && data.appointments) {
     allAppointments = data.appointments;
@@ -169,9 +372,12 @@ async function loadAllData() {
     const totalRecords = document.getElementById('totalRecords');
     if (totalRecords) totalRecords.innerText = allAppointments.length;
     if (document.getElementById('appointmentsPage')?.classList.contains('active')) loadAllAppointmentsList();
-  } else { showToast('Could not load data', 'error'); }
+  } else { showToast('Could not load data from server', 'error'); }
 }
 
+/**
+ * Update dashboard statistics cards
+ */
 function updateDashboardStats() {
   const today = getBangladeshDate();
   const todayApps = allAppointments.filter(a => a.date === today);
@@ -198,6 +404,9 @@ function updateDashboardStats() {
   if (totalPending) totalPending.innerText = pendingApps.length;
 }
 
+/**
+ * Update quick statistics in sidebar
+ */
 function updateQuickStats() {
   const revenueElem = document.getElementById('totalRevenue');
   const rateElem = document.getElementById('completionRate');
@@ -209,25 +418,37 @@ function updateQuickStats() {
   if (doctorsElem) doctorsElem.innerText = doctors.length || 1;
 }
 
+/**
+ * Load recent appointments for dashboard
+ */
 function loadRecentAppointments() {
   const container = document.getElementById('recentAppointments');
   if (!container) return;
   const recent = [...allAppointments].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0,5);
   if (recent.length === 0) { container.innerHTML = '<div class="empty-state">No appointments yet</div>'; return; }
   container.innerHTML = recent.map(app => `
-    <div class="history-item" onclick="openEditAppointmentModal('${app.bookingId}')">
-      <div style="display:flex;justify-content:space-between"><strong>🐾 ${escapeHtml(app.petName)}</strong><span class="token">${app.token}</span><span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span></div>
-      <div>👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone} | 📅 ${app.date} | ⏰ ${app.time}</div>
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between"><strong>${escapeHtml(app.petName)}</strong><span class="token">${app.token}</span><span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
+      <div>${escapeHtml(app.ownerName)} | ${app.ownerPhone} | ${app.date} | ${app.time}</div>
     </div>
   `).join('');
 }
 
 // ============================================
-// ALL APPOINTMENTS (with Edit/Delete)
+// SECTION 11: ALL APPOINTMENTS LIST (FIXED LOADING ISSUE)
 // ============================================
+
+/**
+ * Load all appointments list with filters and pagination
+ */
 function loadAllAppointmentsList() {
+  if (!hasPermission('view_appointments')) return;
   const container = document.getElementById('allAppointmentsList');
   if (!container) return;
+  
+  // Show loading state
+  container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading appointments...</div>';
+  
   const filterText = document.getElementById('filterInput')?.value.toLowerCase() || '';
   const statusFilter = document.getElementById('statusFilter')?.value || 'all';
   const dateFilter = document.getElementById('dateFilter')?.value || 'all';
@@ -253,533 +474,769 @@ function loadAllAppointmentsList() {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginated = filtered.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage);
   
-  if (paginated.length === 0) { container.innerHTML = '<div class="empty-state">No appointments found</div>'; }
-  else {
+  const hasEditPerm = hasPermission('edit_appointments');
+  
+  if (paginated.length === 0) { 
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i> No appointments found</div>'; 
+  } else {
     container.innerHTML = paginated.map(app => `
-      <div class="history-item" onclick="openEditAppointmentModal('${app.bookingId}')">
-        <div style="display:flex;justify-content:space-between;flex-wrap:wrap"><div><strong>🐾 ${escapeHtml(app.petName)}</strong><div style="font-size:0.8rem">📅 ${app.date} | ⏰ ${app.time}</div></div><div><span class="token">${app.token}</span><span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span></div></div>
+      <div class="history-item" ${hasEditPerm ? `onclick="viewAppointment('${app.bookingId}')"` : ''} style="${!hasEditPerm ? 'cursor:default' : 'cursor:pointer'}">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
+          <div><strong>${escapeHtml(app.petName)}</strong><div style="font-size:0.8rem">📅 ${app.date} | ⏰ ${app.time}</div></div>
+          <div><span class="token">${app.token}</span><span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
+        </div>
         <div>👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}</div>
         <div>📋 ${escapeHtml(app.symptoms || 'N/A')}${app.diagnosis ? `<br>🩺 ${escapeHtml(app.diagnosis)}` : ''}</div>
-        <div style="margin-top:12px; display:flex; gap:8px;">
-          <button class="btn-edit-sm" onclick="event.stopPropagation(); openEditAppointmentModal('${app.bookingId}')"><i class="fas fa-edit"></i> Edit</button>
-          <button class="btn-delete-sm" onclick="event.stopPropagation(); deleteAppointment('${app.bookingId}')"><i class="fas fa-trash-alt"></i> Delete</button>
-        </div>
+        ${hasEditPerm ? `<div style="margin-top:12px; display:flex; gap:8px;">
+          <button class="btn-secondary" onclick="event.stopPropagation(); editAppointment('${app.bookingId}')"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn-danger" onclick="event.stopPropagation(); hardDeleteAppointment('${app.bookingId}')"><i class="fas fa-trash-alt"></i> Delete</button>
+        </div>` : ''}
       </div>
     `).join('');
   }
   renderPagination(totalPages);
 }
 
+/**
+ * Render pagination buttons
+ * @param {number} totalPages - Total number of pages
+ */
 function renderPagination(totalPages) {
   const container = document.getElementById('pagination');
   if (!container) return;
   if (totalPages <= 1) { container.innerHTML = ''; return; }
   let html = '';
-  for (let i = 1; i <= Math.min(totalPages, 10); i++) html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPageNum(${i})">${i}</button>`;
+  for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+    html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPageNum(${i})">📄 ${i}</button>`;
+  }
   container.innerHTML = html;
 }
 
-function goToPageNum(page) { currentPage = page; loadAllAppointmentsList(); }
-function filterAppointments() { currentPage = 1; loadAllAppointmentsList(); }
-function getStatusClass(status) {
-  if (status === 'Completed') return 'completed';
-  if (status === 'Cancelled') return 'cancelled';
-  if (status === 'In Progress') return 'progress';
-  return 'confirmed';
+/**
+ * Go to specific page number
+ * @param {number} page - Page number to navigate to
+ */
+function goToPageNum(page) { 
+  currentPage = page; 
+  loadAllAppointmentsList(); 
+}
+
+/**
+ * Filter appointments (reset to page 1)
+ */
+function filterAppointments() { 
+  currentPage = 1; 
+  loadAllAppointmentsList(); 
 }
 
 // ============================================
-// EDIT APPOINTMENT MODAL (MODERN)
+// SECTION 12: VIEW APPOINTMENT DETAILS (FIXED)
 // ============================================
-function openEditAppointmentModal(bookingId) {
+
+/**
+ * View appointment details in modal
+ * @param {string} bookingId - Booking ID to view
+ */
+function viewAppointment(bookingId) {
   const app = allAppointments.find(a => a.bookingId === bookingId);
-  if (!app) return;
+  if (!app) {
+    showToast('Appointment not found!', 'error');
+    return;
+  }
   
-  // Create modal dynamically
-  const modalHtml = `
-    <div id="editAppointmentModal" class="modal modern-modal show" style="display:flex">
-      <div class="modal-card">
-        <div class="modal-header-custom">
-          <div class="modal-title-custom">
-            <i class="fas fa-calendar-edit"></i>
-            <h3>Edit Appointment</h3>
-          </div>
-          <button class="modal-close" onclick="closeEditAppointmentModal()">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body-custom">
-          <div class="form-group-custom">
-            <label><i class="fas fa-tag"></i> Token</label>
-            <input type="text" id="editToken" class="input-custom" value="${app.token}" readonly>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-paw"></i> Pet Name</label>
-            <input type="text" id="editPetName" class="input-custom" value="${escapeHtml(app.petName)}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-user"></i> Owner Name</label>
-            <input type="text" id="editOwnerName" class="input-custom" value="${escapeHtml(app.ownerName)}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-phone"></i> Phone Number</label>
-            <input type="text" id="editPhone" class="input-custom" value="${app.ownerPhone}">
-          </div>
-          <div class="form-row-custom">
-            <div class="form-group-custom">
-              <label><i class="fas fa-calendar"></i> Date</label>
-              <input type="date" id="editDate" class="input-custom" value="${app.date}">
-            </div>
-            <div class="form-group-custom">
-              <label><i class="fas fa-clock"></i> Time</label>
-              <input type="time" id="editTime" class="input-custom" value="${app.time}">
-            </div>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-notes-medical"></i> Symptoms</label>
-            <textarea id="editSymptoms" rows="2" class="textarea-custom">${escapeHtml(app.symptoms || '')}</textarea>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-stethoscope"></i> Diagnosis</label>
-            <textarea id="editDiagnosis" rows="2" class="textarea-custom">${escapeHtml(app.diagnosis || '')}</textarea>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-prescription-bottle"></i> Prescription</label>
-            <textarea id="editPrescription" rows="3" class="textarea-custom">${escapeHtml(app.prescription || '')}</textarea>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-flag-checkered"></i> Status</label>
-            <select id="editStatus" class="input-custom">
-              <option value="Confirmed" ${app.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
-              <option value="In Progress" ${app.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-              <option value="Completed" ${app.status === 'Completed' ? 'selected' : ''}>Completed</option>
-              <option value="Cancelled" ${app.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn-secondary-custom" onclick="closeEditAppointmentModal()">Cancel</button>
-          <button class="btn-primary-custom" onclick="saveEditAppointment('${bookingId}')">
-            <i class="fas fa-save"></i> Save Changes
-          </button>
-        </div>
-      </div>
+  const modal = document.getElementById('viewAppointmentModal');
+  const detailsDiv = document.getElementById('appointmentDetails');
+  
+  if (!modal || !detailsDiv) {
+    console.error('Modal or details div not found');
+    return;
+  }
+  
+  detailsDiv.innerHTML = `
+    <div class="appointment-full-details" style="padding: 10px;">
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🆔 Token:</strong> <span>${app.token}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📅 Date:</strong> <span>${app.date}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">⏰ Time:</strong> <span>${app.time}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🐾 Pet Name:</strong> <span>${escapeHtml(app.petName)}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🎂 Pet Age:</strong> <span>${app.petAge || 'N/A'}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">⚖️ Weight:</strong> <span>${app.weight || 'N/A'} kg</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">👤 Owner Name:</strong> <span>${escapeHtml(app.ownerName)}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📞 Phone:</strong> <span>${app.ownerPhone}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📋 Symptoms:</strong> <span>${escapeHtml(app.symptoms || 'N/A')}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🩺 Diagnosis:</strong> <span>${escapeHtml(app.diagnosis || 'N/A')}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">💊 Prescription:</strong> <span>${escapeHtml(app.prescription || 'N/A')}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📝 Treatment Plan:</strong> <span>${escapeHtml(app.treatmentPlan || 'N/A')}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📅 Follow-up Date:</strong> <span>${app.followUpDate || 'N/A'}</span></div>
+      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">✅ Status:</strong> <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
     </div>
   `;
   
-  // Remove existing modal if any
-  const existingModal = document.getElementById('editAppointmentModal');
-  if (existingModal) existingModal.remove();
-  
-  // Add modal to body
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  modal.classList.add('show');
+  modal.style.display = 'flex';
+  window.currentViewBookingId = bookingId;
 }
 
-function closeEditAppointmentModal() {
-  const modal = document.getElementById('editAppointmentModal');
-  if (modal) modal.remove();
-}
-
-function saveEditAppointment(bookingId) {
-  const index = allAppointments.findIndex(a => a.bookingId === bookingId);
-  if (index !== -1) {
-    allAppointments[index] = {
-      ...allAppointments[index],
-      petName: document.getElementById('editPetName')?.value || '',
-      ownerName: document.getElementById('editOwnerName')?.value || '',
-      ownerPhone: document.getElementById('editPhone')?.value || '',
-      date: document.getElementById('editDate')?.value || '',
-      time: document.getElementById('editTime')?.value || '',
-      symptoms: document.getElementById('editSymptoms')?.value || '',
-      diagnosis: document.getElementById('editDiagnosis')?.value || '',
-      prescription: document.getElementById('editPrescription')?.value || '',
-      status: document.getElementById('editStatus')?.value || 'Confirmed'
-    };
-    
-    // Update localStorage
-    const bookings = {};
-    allAppointments.forEach(a => {
-      if (!bookings[a.date]) bookings[a.date] = [];
-      bookings[a.date].push(a.timeSlot);
-    });
-    localStorage.setItem('vet_bookings', JSON.stringify(bookings));
-    
-    closeEditAppointmentModal();
-    refreshAllData();
-    showToast('Appointment updated successfully!', 'success');
+/**
+ * Close view appointment modal
+ */
+function closeViewAppointmentModal() {
+  const modal = document.getElementById('viewAppointmentModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
   }
 }
 
-function deleteAppointment(bookingId) {
-  if (confirm('⚠️ Are you sure you want to delete this appointment permanently?')) {
+/**
+ * Delete appointment from modal
+ */
+function deleteAppointmentFromModal() { 
+  if (confirm('Are you sure you want to delete this appointment?')) {
+    hardDeleteAppointment(window.currentViewBookingId); 
+    closeViewAppointmentModal(); 
+  } 
+}
+
+/**
+ * Edit appointment status
+ * @param {string} bookingId - Booking ID to edit
+ */
+function editAppointment(bookingId) {
+  const newStatus = prompt('Change status (Confirmed/In Progress/Completed/Cancelled):');
+  if (newStatus && ['Confirmed', 'In Progress', 'Completed', 'Cancelled'].includes(newStatus)) {
+    const app = allAppointments.find(a => a.bookingId === bookingId);
+    if (app) app.status = newStatus;
+    refreshAllData();
+    showToast('✅ Status updated!', 'success');
+  }
+}
+
+// ============================================
+// SECTION 12.1: FIXED DELETE APPOINTMENT FUNCTION
+// ============================================
+
+/**
+ * Hard delete appointment from all storage locations
+ * @param {string} bookingId - Booking ID to delete
+ */
+function hardDeleteAppointment(bookingId) {
+  if (confirm('⚠️ PERMANENT DELETE: This will remove the appointment from all records. Continue?')) {
+    
+    // Find the appointment to delete for logging
+    const appointmentToDelete = allAppointments.find(a => a.bookingId === bookingId);
+    const initialLength = allAppointments.length;
+    
+    // 1. Remove from allAppointments array
     allAppointments = allAppointments.filter(a => a.bookingId !== bookingId);
+    
+    // 2. Update localStorage backup (vet_bookings)
     const bookings = {};
     allAppointments.forEach(a => {
       if (!bookings[a.date]) bookings[a.date] = [];
       bookings[a.date].push(a.timeSlot);
     });
     localStorage.setItem('vet_bookings', JSON.stringify(bookings));
+    
+    // 3. Force refresh the UI
     refreshAllData();
-    showToast('Appointment deleted successfully!', 'success');
+    
+    // 4. Reload current page view
+    if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
+      setTimeout(() => {
+        loadAllAppointmentsList();
+      }, 100);
+    }
+    
+    // 5. Update dashboard stats
+    updateDashboardStats();
+    loadRecentAppointments();
+    updateQuickStats();
+    
+    // 6. Update appointment badge
+    const today = getBangladeshDate();
+    const todayCount = allAppointments.filter(a => a.date === today).length;
+    const badge = document.getElementById('appointmentBadge');
+    if (badge) badge.innerText = todayCount;
+    
+    // 7. Update total records count
+    const totalRecords = document.getElementById('totalRecords');
+    if (totalRecords) totalRecords.innerText = allAppointments.length;
+    
+    // 8. Show success message with details
+    if (appointmentToDelete) {
+      showToast(`✅ Appointment for "${appointmentToDelete.petName}" deleted successfully! Removed from ${initialLength - allAppointments.length} record(s).`, 'success');
+    } else {
+      showToast(`✅ Appointment deleted successfully! Removed from ${initialLength - allAppointments.length} record(s).`, 'success');
+    }
+    
+    // 9. Log for debugging
+    console.log(`Deleted appointment: ${bookingId}. Remaining appointments: ${allAppointments.length}`);
+    
+    // 10. Close modal if open
+    closeViewAppointmentModal();
   }
 }
 
+/**
+ * Alternative: Simple delete with confirmation
+ * @param {string} bookingId - Booking ID to delete
+ */
+function deleteAppointment(bookingId) {
+  hardDeleteAppointment(bookingId);
+}
+
 // ============================================
-// DOCTOR MANAGEMENT (MODERN EDIT MODAL)
+// SECTION 13: DOCTOR MANAGEMENT (CRUD)
 // ============================================
+
+/**
+ * Load doctors from localStorage
+ */
 function loadDoctors() {
+  if (!hasPermission('manage_doctors')) return;
   const stored = localStorage.getItem('clinic_doctors');
-  doctors = stored ? JSON.parse(stored) : [{ id: 1, name: 'Dr. Mitesh Tripura', email: 'doctor@vetforpet.com', specialization: 'Senior Veterinary Surgeon', phone: '01406779238', schedule: 'Sat-Wed 9AM-9PM' }];
+  doctors = stored ? JSON.parse(stored) : [];
   localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
   renderDoctors();
 }
 
+/**
+ * Render doctors list in UI
+ */
 function renderDoctors() {
   const container = document.getElementById('doctorsList');
   if (!container) return;
-  if (!doctors.length) { container.innerHTML = '<div class="empty-state">No doctors added</div>'; return; }
+  if (!doctors.length) { container.innerHTML = '<div class="empty-state"><i class="fas fa-user-md"></i> No doctors added</div>'; return; }
   container.innerHTML = doctors.map(doc => `
     <div class="history-item">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
-        <div><strong><i class="fas fa-user-md"></i> ${escapeHtml(doc.name)}</strong><div>🔬 ${escapeHtml(doc.specialization)}</div><div>📧 ${doc.email} | 📞 ${doc.phone || 'N/A'}</div><div>⏰ ${doc.schedule || 'Flexible'}</div></div>
-        <div><button class="btn-edit-sm" onclick="openEditDoctorModal(${doc.id})"><i class="fas fa-edit"></i> Edit</button> <button class="btn-delete-sm" onclick="deleteDoctor(${doc.id})"><i class="fas fa-trash-alt"></i> Delete</button></div>
+        <div>
+          <div><i class="fas fa-user-md" style="color:#f97316"></i> <strong>${escapeHtml(doc.name)}</strong></div>
+          <div style="font-size:0.85rem">🔬 ${escapeHtml(doc.specialization)}</div>
+          <div style="font-size:0.8rem">📧 ${doc.email} | 📞 ${doc.phone || 'N/A'}</div>
+          <div style="font-size:0.8rem">⏰ ${doc.schedule || 'Flexible'}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" onclick="openEditDoctorModal(${doc.id})"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn-danger" onclick="deleteDoctor(${doc.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+        </div>
       </div>
     </div>
   `).join('');
 }
 
-function openEditDoctorModal(id) {
-  const doctor = doctors.find(d => d.id === id);
-  if (!doctor) return;
-  
-  const modalHtml = `
-    <div id="editDoctorModalNew" class="modal modern-modal show" style="display:flex">
-      <div class="modal-card">
-        <div class="modal-header-custom">
-          <div class="modal-title-custom">
-            <i class="fas fa-user-edit"></i>
-            <h3>Edit Doctor</h3>
-          </div>
-          <button class="modal-close" onclick="closeEditDoctorModalNew()">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body-custom">
-          <div class="form-group-custom">
-            <label><i class="fas fa-user"></i> Full Name</label>
-            <input type="text" id="editDoctorNameNew" class="input-custom" value="${escapeHtml(doctor.name)}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-envelope"></i> Email</label>
-            <input type="email" id="editDoctorEmailNew" class="input-custom" value="${doctor.email}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-stethoscope"></i> Specialization</label>
-            <input type="text" id="editDoctorSpecializationNew" class="input-custom" value="${escapeHtml(doctor.specialization)}">
-          </div>
-          <div class="form-row-custom">
-            <div class="form-group-custom">
-              <label><i class="fas fa-phone"></i> Phone</label>
-              <input type="text" id="editDoctorPhoneNew" class="input-custom" value="${doctor.phone || ''}">
-            </div>
-            <div class="form-group-custom">
-              <label><i class="fas fa-calendar-alt"></i> Schedule</label>
-              <input type="text" id="editDoctorScheduleNew" class="input-custom" value="${doctor.schedule || ''}">
-            </div>
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-lock"></i> New Password (optional)</label>
-            <input type="password" id="editDoctorPasswordNew" class="input-custom" placeholder="Leave blank to keep same">
-          </div>
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn-secondary-custom" onclick="closeEditDoctorModalNew()">Cancel</button>
-          <button class="btn-primary-custom" onclick="saveEditDoctor(${doctor.id})">
-            <i class="fas fa-save"></i> Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const existingModal = document.getElementById('editDoctorModalNew');
-  if (existingModal) existingModal.remove();
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+/**
+ * Show add doctor modal
+ */
+function showAddDoctorModal() { 
+  const m = document.getElementById('addDoctorModal'); 
+  if(m) { 
+    m.classList.add('show'); 
+    m.style.display = 'flex'; 
+  } 
 }
 
-function closeEditDoctorModalNew() {
-  const modal = document.getElementById('editDoctorModalNew');
-  if (modal) modal.remove();
+/**
+ * Close add doctor modal
+ */
+function closeAddDoctorModal() { 
+  const m = document.getElementById('addDoctorModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+    document.querySelectorAll('#addDoctorModal input').forEach(inp => inp.value = '');
+  } 
 }
 
-function saveEditDoctor(id) {
-  const index = doctors.findIndex(d => d.id === id);
-  if (index !== -1) {
-    doctors[index] = {
-      ...doctors[index],
-      name: document.getElementById('editDoctorNameNew')?.value || '',
-      email: document.getElementById('editDoctorEmailNew')?.value || '',
-      specialization: document.getElementById('editDoctorSpecializationNew')?.value || '',
-      phone: document.getElementById('editDoctorPhoneNew')?.value || '',
-      schedule: document.getElementById('editDoctorScheduleNew')?.value || ''
-    };
-    const newPassword = document.getElementById('editDoctorPasswordNew')?.value;
-    if (newPassword) doctors[index].password = newPassword;
-    
-    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-    renderDoctors();
-    closeEditDoctorModalNew();
-    showToast('Doctor updated successfully!', 'success');
-  }
-}
-
-function deleteDoctor(id) {
-  if (confirm('⚠️ Delete this doctor permanently?')) {
-    doctors = doctors.filter(d => d.id !== id);
-    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-    renderDoctors();
-    showToast('Doctor deleted', 'success');
-  }
-}
-
-// ============================================
-// SERVICES MANAGEMENT (MODERN EDIT MODAL)
-// ============================================
-function loadServices() {
-  const stored = localStorage.getItem('clinic_services');
-  services = stored ? JSON.parse(stored) : [{ id: 1, name: 'General Checkup', icon: 'fa-stethoscope', desc: 'Complete physical exam', price: 500, duration: 30 }, { id: 2, name: 'Vaccination', icon: 'fa-syringe', desc: 'Core vaccines', price: 800, duration: 20 }, { id: 3, name: 'Dental Care', icon: 'fa-tooth', desc: 'Scaling & hygiene', price: 1000, duration: 45 }];
-  localStorage.setItem('clinic_services', JSON.stringify(services));
-  renderServices();
-}
-
-function renderServices() {
-  const container = document.getElementById('servicesList');
-  if (!container) return;
-  if (!services.length) { container.innerHTML = '<div class="empty-state">No services added</div>'; return; }
-  container.innerHTML = services.map(service => `
-    <div class="history-item">
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
-        <div><strong><i class="fas ${service.icon}"></i> ${escapeHtml(service.name)}</strong><div>${escapeHtml(service.desc)}</div><div>💰 ৳${service.price} | ⏱️ ${service.duration} min</div></div>
-        <div><button class="btn-edit-sm" onclick="openEditServiceModal(${service.id})"><i class="fas fa-edit"></i> Edit</button> <button class="btn-delete-sm" onclick="deleteService(${service.id})"><i class="fas fa-trash-alt"></i> Delete</button></div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function openEditServiceModal(id) {
-  const service = services.find(s => s.id === id);
-  if (!service) return;
-  
-  const modalHtml = `
-    <div id="editServiceModalNew" class="modal modern-modal show" style="display:flex">
-      <div class="modal-card">
-        <div class="modal-header-custom">
-          <div class="modal-title-custom">
-            <i class="fas fa-edit"></i>
-            <h3>Edit Service</h3>
-          </div>
-          <button class="modal-close" onclick="closeEditServiceModalNew()">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body-custom">
-          <div class="form-group-custom">
-            <label><i class="fas fa-tag"></i> Service Name</label>
-            <input type="text" id="editServiceNameNew" class="input-custom" value="${escapeHtml(service.name)}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-icons"></i> Icon</label>
-            <input type="text" id="editServiceIconNew" class="input-custom" value="${service.icon}">
-          </div>
-          <div class="form-group-custom">
-            <label><i class="fas fa-align-left"></i> Description</label>
-            <textarea id="editServiceDescNew" rows="3" class="textarea-custom">${escapeHtml(service.desc)}</textarea>
-          </div>
-          <div class="form-row-custom">
-            <div class="form-group-custom">
-              <label><i class="fas fa-money-bill-wave"></i> Price (BDT)</label>
-              <input type="number" id="editServicePriceNew" class="input-custom" value="${service.price}">
-            </div>
-            <div class="form-group-custom">
-              <label><i class="fas fa-hourglass-half"></i> Duration (mins)</label>
-              <input type="number" id="editServiceDurationNew" class="input-custom" value="${service.duration}">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn-secondary-custom" onclick="closeEditServiceModalNew()">Cancel</button>
-          <button class="btn-primary-custom" onclick="saveEditService(${service.id})">
-            <i class="fas fa-save"></i> Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const existingModal = document.getElementById('editServiceModalNew');
-  if (existingModal) existingModal.remove();
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-function closeEditServiceModalNew() {
-  const modal = document.getElementById('editServiceModalNew');
-  if (modal) modal.remove();
-}
-
-function saveEditService(id) {
-  const index = services.findIndex(s => s.id === id);
-  if (index !== -1) {
-    services[index] = {
-      ...services[index],
-      name: document.getElementById('editServiceNameNew')?.value || '',
-      icon: document.getElementById('editServiceIconNew')?.value || 'fa-stethoscope',
-      desc: document.getElementById('editServiceDescNew')?.value || '',
-      price: parseInt(document.getElementById('editServicePriceNew')?.value) || 0,
-      duration: parseInt(document.getElementById('editServiceDurationNew')?.value) || 30
-    };
-    
-    localStorage.setItem('clinic_services', JSON.stringify(services));
-    renderServices();
-    closeEditServiceModalNew();
-    showToast('Service updated successfully!', 'success');
-  }
-}
-
-function deleteService(id) {
-  if (confirm('⚠️ Delete this service permanently?')) {
-    services = services.filter(s => s.id !== id);
-    localStorage.setItem('clinic_services', JSON.stringify(services));
-    renderServices();
-    showToast('Service deleted', 'success');
-  }
-}
-
-// ============================================
-// ADD FUNCTIONS (Modern Modals)
-// ============================================
-function showAddDoctorModal() {
-  const modalHtml = `
-    <div id="addDoctorModalNew" class="modal modern-modal show" style="display:flex">
-      <div class="modal-card">
-        <div class="modal-header-custom">
-          <div class="modal-title-custom">
-            <i class="fas fa-user-md"></i>
-            <h3>Add New Doctor</h3>
-          </div>
-          <button class="modal-close" onclick="closeAddDoctorModalNew()">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body-custom">
-          <div class="form-group-custom"><label><i class="fas fa-user"></i> Full Name</label><input type="text" id="newDoctorNameNew" class="input-custom" placeholder="Dr. John Doe"></div>
-          <div class="form-group-custom"><label><i class="fas fa-envelope"></i> Email</label><input type="email" id="newDoctorEmailNew" class="input-custom" placeholder="doctor@vetforpet.com"></div>
-          <div class="form-group-custom"><label><i class="fas fa-lock"></i> Password</label><input type="password" id="newDoctorPasswordNew" class="input-custom" placeholder="Enter password"></div>
-          <div class="form-group-custom"><label><i class="fas fa-stethoscope"></i> Specialization</label><input type="text" id="newDoctorSpecializationNew" class="input-custom" placeholder="Cardiology, Surgery"></div>
-          <div class="form-row-custom"><div class="form-group-custom"><label><i class="fas fa-phone"></i> Phone</label><input type="text" id="newDoctorPhoneNew" class="input-custom" placeholder="01XXXXXXXXX"></div><div class="form-group-custom"><label><i class="fas fa-calendar-alt"></i> Schedule</label><input type="text" id="newDoctorScheduleNew" class="input-custom" placeholder="Sat-Wed 9AM-5PM"></div></div>
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn-secondary-custom" onclick="closeAddDoctorModalNew()">Cancel</button>
-          <button class="btn-primary-custom" onclick="addDoctorNew()"><i class="fas fa-plus"></i> Add Doctor</button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const existingModal = document.getElementById('addDoctorModalNew');
-  if (existingModal) existingModal.remove();
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-function closeAddDoctorModalNew() {
-  const modal = document.getElementById('addDoctorModalNew');
-  if (modal) modal.remove();
-}
-
-function addDoctorNew() {
-  const newDoctor = {
-    id: Date.now(),
-    name: document.getElementById('newDoctorNameNew')?.value || '',
-    email: document.getElementById('newDoctorEmailNew')?.value || '',
-    password: document.getElementById('newDoctorPasswordNew')?.value || '',
-    specialization: document.getElementById('newDoctorSpecializationNew')?.value || '',
-    phone: document.getElementById('newDoctorPhoneNew')?.value || '',
-    schedule: document.getElementById('newDoctorScheduleNew')?.value || ''
+/**
+ * Add new doctor
+ */
+function addDoctor() {
+  const newDoctor = { 
+    id: Date.now(), 
+    name: document.getElementById('newDoctorName')?.value, 
+    email: document.getElementById('newDoctorEmail')?.value, 
+    password: document.getElementById('newDoctorPassword')?.value, 
+    specialization: document.getElementById('newDoctorSpecialization')?.value, 
+    phone: document.getElementById('newDoctorPhone')?.value, 
+    schedule: document.getElementById('newDoctorSchedule')?.value 
   };
-  
-  if (!newDoctor.name || !newDoctor.email) {
-    showToast('Please fill required fields', 'error');
-    return;
+  if (!newDoctor.name || !newDoctor.email) { 
+    showToast('⚠️ Please fill required fields', 'error'); 
+    return; 
   }
-  
   doctors.push(newDoctor);
   localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
   renderDoctors();
-  closeAddDoctorModalNew();
-  showToast('Doctor added successfully!', 'success');
+  closeAddDoctorModal();
+  showToast('✅ Doctor added successfully!', 'success');
 }
 
-function showAddServiceModal() {
-  const modalHtml = `
-    <div id="addServiceModalNew" class="modal modern-modal show" style="display:flex">
-      <div class="modal-card">
-        <div class="modal-header-custom">
-          <div class="modal-title-custom">
-            <i class="fas fa-stethoscope"></i>
-            <h3>Add New Service</h3>
-          </div>
-          <button class="modal-close" onclick="closeAddServiceModalNew()">
-            <i class="fas fa-times"></i>
-          </button>
+/**
+ * Open edit doctor modal
+ * @param {number} id - Doctor ID to edit
+ */
+function openEditDoctorModal(id) {
+  const doctor = doctors.find(d => d.id === id);
+  if (!doctor) return;
+  document.getElementById('editDoctorId').value = doctor.id;
+  document.getElementById('editDoctorName').value = doctor.name;
+  document.getElementById('editDoctorEmail').value = doctor.email;
+  document.getElementById('editDoctorSpecialization').value = doctor.specialization || '';
+  document.getElementById('editDoctorPhone').value = doctor.phone || '';
+  document.getElementById('editDoctorSchedule').value = doctor.schedule || '';
+  document.getElementById('editDoctorPassword').value = '';
+  const modal = document.getElementById('editDoctorModal');
+  if (modal) { 
+    modal.classList.add('show'); 
+    modal.style.display = 'flex'; 
+  }
+}
+
+/**
+ * Close edit doctor modal
+ */
+function closeEditDoctorModal() { 
+  const m = document.getElementById('editDoctorModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+  } 
+}
+
+/**
+ * Update doctor information
+ */
+function updateDoctor() {
+  const id = parseInt(document.getElementById('editDoctorId')?.value);
+  const index = doctors.findIndex(d => d.id === id);
+  if (index !== -1) {
+    doctors[index] = { 
+      ...doctors[index], 
+      name: document.getElementById('editDoctorName')?.value, 
+      email: document.getElementById('editDoctorEmail')?.value, 
+      specialization: document.getElementById('editDoctorSpecialization')?.value, 
+      phone: document.getElementById('editDoctorPhone')?.value, 
+      schedule: document.getElementById('editDoctorSchedule')?.value 
+    };
+    const newPassword = document.getElementById('editDoctorPassword')?.value;
+    if (newPassword) doctors[index].password = newPassword;
+    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+    renderDoctors();
+    closeEditDoctorModal();
+    showToast('✅ Doctor updated successfully!', 'success');
+  }
+}
+
+/**
+ * Delete doctor
+ * @param {number} id - Doctor ID to delete
+ */
+function deleteDoctor(id) { 
+  if (confirm('⚠️ Delete this doctor permanently?')) { 
+    doctors = doctors.filter(d => d.id !== id); 
+    localStorage.setItem('clinic_doctors', JSON.stringify(doctors)); 
+    renderDoctors(); 
+    showToast('🗑️ Doctor deleted', 'success'); 
+  } 
+}
+
+// ============================================
+// SECTION 14: SERVICES MANAGEMENT (CRUD)
+// ============================================
+
+/**
+ * Load services from localStorage
+ */
+function loadServices() {
+  if (!hasPermission('manage_services')) return;
+  const stored = localStorage.getItem('clinic_services');
+  services = stored ? JSON.parse(stored) : [];
+  localStorage.setItem('clinic_services', JSON.stringify(services));
+  renderServices();
+}
+
+/**
+ * Render services list in UI
+ */
+function renderServices() {
+  const container = document.getElementById('servicesList');
+  if (!container) return;
+  if (!services.length) { container.innerHTML = '<div class="empty-state"><i class="fas fa-stethoscope"></i> No services added</div>'; return; }
+  container.innerHTML = services.map(service => `
+    <div class="history-item">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
+        <div>
+          <div><i class="fas ${service.icon}" style="color:#f97316"></i> <strong>${escapeHtml(service.name)}</strong></div>
+          <div style="font-size:0.85rem">📝 ${escapeHtml(service.desc)}</div>
+          <div style="font-size:0.8rem">💰 ৳${service.price} | ⏱️ ${service.duration} min</div>
         </div>
-        <div class="modal-body-custom">
-          <div class="form-group-custom"><label><i class="fas fa-tag"></i> Service Name</label><input type="text" id="newServiceNameNew" class="input-custom" placeholder="e.g., General Checkup"></div>
-          <div class="form-group-custom"><label><i class="fas fa-icons"></i> Icon</label><input type="text" id="newServiceIconNew" class="input-custom" placeholder="fa-stethoscope"></div>
-          <div class="form-group-custom"><label><i class="fas fa-align-left"></i> Description</label><textarea id="newServiceDescNew" rows="3" class="textarea-custom" placeholder="Service description..."></textarea></div>
-          <div class="form-row-custom"><div class="form-group-custom"><label><i class="fas fa-money-bill-wave"></i> Price (BDT)</label><input type="number" id="newServicePriceNew" class="input-custom" placeholder="0"></div><div class="form-group-custom"><label><i class="fas fa-hourglass-half"></i> Duration (mins)</label><input type="number" id="newServiceDurationNew" class="input-custom" placeholder="30"></div></div>
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn-secondary-custom" onclick="closeAddServiceModalNew()">Cancel</button>
-          <button class="btn-primary-custom" onclick="addServiceNew()"><i class="fas fa-plus"></i> Add Service</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" onclick="openEditServiceModal(${service.id})"><i class="fas fa-edit"></i> Edit</button>
+          <button class="btn-danger" onclick="deleteService(${service.id})"><i class="fas fa-trash-alt"></i> Delete</button>
         </div>
       </div>
     </div>
-  `;
-  
-  const existingModal = document.getElementById('addServiceModalNew');
-  if (existingModal) existingModal.remove();
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  `).join('');
 }
 
-function closeAddServiceModalNew() {
-  const modal = document.getElementById('addServiceModalNew');
-  if (modal) modal.remove();
+/**
+ * Show add service modal
+ */
+function showAddServiceModal() { 
+  const m = document.getElementById('addServiceModal'); 
+  if(m) { 
+    m.classList.add('show'); 
+    m.style.display = 'flex'; 
+  } 
 }
 
-function addServiceNew() {
-  const newService = {
-    id: Date.now(),
-    name: document.getElementById('newServiceNameNew')?.value || '',
-    icon: document.getElementById('newServiceIconNew')?.value || 'fa-stethoscope',
-    desc: document.getElementById('newServiceDescNew')?.value || '',
-    price: parseInt(document.getElementById('newServicePriceNew')?.value) || 0,
-    duration: parseInt(document.getElementById('newServiceDurationNew')?.value) || 30
+/**
+ * Close add service modal
+ */
+function closeAddServiceModal() { 
+  const m = document.getElementById('addServiceModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+    document.querySelectorAll('#addServiceModal input, #addServiceModal textarea').forEach(inp => inp.value = '');
+  } 
+}
+
+/**
+ * Add new service
+ */
+function addService() {
+  const newService = { 
+    id: Date.now(), 
+    name: document.getElementById('newServiceName')?.value, 
+    icon: document.getElementById('newServiceIcon')?.value || 'fa-stethoscope', 
+    desc: document.getElementById('newServiceDesc')?.value, 
+    price: parseInt(document.getElementById('newServicePrice')?.value) || 0, 
+    duration: parseInt(document.getElementById('newServiceDuration')?.value) || 30 
   };
-  
-  if (!newService.name) {
-    showToast('Please enter service name', 'error');
-    return;
+  if (!newService.name) { 
+    showToast('⚠️ Please enter service name', 'error'); 
+    return; 
   }
-  
   services.push(newService);
   localStorage.setItem('clinic_services', JSON.stringify(services));
   renderServices();
-  closeAddServiceModalNew();
-  showToast('Service added successfully!', 'success');
+  closeAddServiceModal();
+  showToast('✅ Service added successfully!', 'success');
+}
+
+/**
+ * Open edit service modal
+ * @param {number} id - Service ID to edit
+ */
+function openEditServiceModal(id) {
+  const service = services.find(s => s.id === id);
+  if (!service) return;
+  document.getElementById('editServiceId').value = service.id;
+  document.getElementById('editServiceName').value = service.name;
+  document.getElementById('editServiceIcon').value = service.icon;
+  document.getElementById('editServiceDesc').value = service.desc;
+  document.getElementById('editServicePrice').value = service.price;
+  document.getElementById('editServiceDuration').value = service.duration;
+  const modal = document.getElementById('editServiceModal');
+  if (modal) { 
+    modal.classList.add('show'); 
+    modal.style.display = 'flex'; 
+  }
+}
+
+/**
+ * Close edit service modal
+ */
+function closeEditServiceModal() { 
+  const m = document.getElementById('editServiceModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+  } 
+}
+
+/**
+ * Update service information
+ */
+function updateService() {
+  const id = parseInt(document.getElementById('editServiceId')?.value);
+  const index = services.findIndex(s => s.id === id);
+  if (index !== -1) {
+    services[index] = { 
+      ...services[index], 
+      name: document.getElementById('editServiceName')?.value, 
+      icon: document.getElementById('editServiceIcon')?.value, 
+      desc: document.getElementById('editServiceDesc')?.value, 
+      price: parseInt(document.getElementById('editServicePrice')?.value) || 0, 
+      duration: parseInt(document.getElementById('editServiceDuration')?.value) || 30 
+    };
+    localStorage.setItem('clinic_services', JSON.stringify(services));
+    renderServices();
+    closeEditServiceModal();
+    showToast('✅ Service updated successfully!', 'success');
+  }
+}
+
+/**
+ * Delete service
+ * @param {number} id - Service ID to delete
+ */
+function deleteService(id) { 
+  if (confirm('⚠️ Delete this service permanently?')) { 
+    services = services.filter(s => s.id !== id); 
+    localStorage.setItem('clinic_services', JSON.stringify(services)); 
+    renderServices(); 
+    showToast('🗑️ Service deleted', 'success'); 
+  } 
 }
 
 // ============================================
-// SETTINGS (Already have functions)
+// SECTION 15: USER MANAGEMENT (Only Super Admin)
 // ============================================
+
+/**
+ * Load users from localStorage
+ */
+function loadUsers() {
+  if (currentUserRole !== 'super_admin') return;
+  const stored = localStorage.getItem('system_users');
+  if (stored) {
+    users = JSON.parse(stored);
+  } else {
+    users = [
+      { id: 1, name: 'Super Admin', email: 'admin@vetforpet.com', role: 'super_admin', password: 'admin123', permissions: 'full' },
+      { id: 2, name: 'Clinic Manager', email: 'manager@vetforpet.com', role: 'manager', password: 'manager123', permissions: 'view_appointments,add_appointments,edit_appointments,manage_doctors,manage_services,reports' },
+      { id: 3, name: 'Receptionist', email: 'reception@vetforpet.com', role: 'receptionist', password: 'reception123', permissions: 'view_appointments,add_appointments,edit_appointments' }
+    ];
+    localStorage.setItem('system_users', JSON.stringify(users));
+  }
+  renderUsers();
+}
+
+/**
+ * Render users list in UI
+ */
+function renderUsers() {
+  const container = document.getElementById('usersList');
+  if (!container) return;
+  if (!users.length) { container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i> No users found</div>'; return; }
+  container.innerHTML = users.map(user => `
+    <div class="history-item">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap">
+        <div>
+          <div><i class="fas fa-user" style="color:#f97316"></i> <strong>${escapeHtml(user.name)}</strong></div>
+          <div style="font-size:0.85rem">📧 ${user.email}</div>
+          <div style="font-size:0.8rem">👑 Role: ${user.role === 'super_admin' ? 'Super Admin' : (user.role === 'manager' ? 'Manager' : 'Receptionist')}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" onclick="openEditUserModal(${user.id})"><i class="fas fa-edit"></i> Edit</button>
+          ${user.role !== 'super_admin' ? `<button class="btn-danger" onclick="deleteUser(${user.id})"><i class="fas fa-trash-alt"></i> Delete</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/**
+ * Show add user modal
+ */
+function showAddUserModal() { 
+  if (currentUserRole !== 'super_admin') { 
+    showPermissionDenied(); 
+    return; 
+  }
+  const m = document.getElementById('addUserModal'); 
+  if(m) { 
+    m.classList.add('show'); 
+    m.style.display = 'flex'; 
+  } 
+}
+
+/**
+ * Close add user modal
+ */
+function closeAddUserModal() { 
+  const m = document.getElementById('addUserModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+    document.querySelectorAll('#addUserModal input, #addUserModal select').forEach(inp => inp.value = '');
+  } 
+}
+
+/**
+ * Add new user
+ */
+function addUser() {
+  const newUser = { 
+    id: Date.now(), 
+    name: document.getElementById('newUserName')?.value, 
+    email: document.getElementById('newUserEmail')?.value, 
+    password: document.getElementById('newUserPassword')?.value, 
+    role: document.getElementById('newUserRole')?.value 
+  };
+  if (!newUser.name || !newUser.email) { 
+    showToast('⚠️ Please fill required fields', 'error'); 
+    return; 
+  }
+  users.push(newUser);
+  localStorage.setItem('system_users', JSON.stringify(users));
+  renderUsers();
+  closeAddUserModal();
+  showToast('✅ User added successfully!', 'success');
+}
+
+/**
+ * Open edit user modal
+ * @param {number} id - User ID to edit
+ */
+function openEditUserModal(id) {
+  const user = users.find(u => u.id === id);
+  if (!user) return;
+  document.getElementById('editUserId').value = user.id;
+  document.getElementById('editUserName').value = user.name;
+  document.getElementById('editUserEmail').value = user.email;
+  document.getElementById('editUserRole').value = user.role;
+  document.getElementById('editUserPassword').value = '';
+  const modal = document.getElementById('editUserModal');
+  if (modal) { 
+    modal.classList.add('show'); 
+    modal.style.display = 'flex'; 
+  }
+}
+
+/**
+ * Close edit user modal
+ */
+function closeEditUserModal() { 
+  const m = document.getElementById('editUserModal'); 
+  if(m) { 
+    m.classList.remove('show'); 
+    m.style.display = 'none'; 
+  } 
+}
+
+/**
+ * Update user information
+ */
+function updateUser() {
+  const id = parseInt(document.getElementById('editUserId')?.value);
+  const index = users.findIndex(u => u.id === id);
+  if (index !== -1) {
+    users[index] = { 
+      ...users[index], 
+      name: document.getElementById('editUserName')?.value, 
+      email: document.getElementById('editUserEmail')?.value, 
+      role: document.getElementById('editUserRole')?.value 
+    };
+    const newPassword = document.getElementById('editUserPassword')?.value;
+    if (newPassword) users[index].password = newPassword;
+    localStorage.setItem('system_users', JSON.stringify(users));
+    renderUsers();
+    closeEditUserModal();
+    showToast('✅ User updated successfully!', 'success');
+  }
+}
+
+/**
+ * Delete user
+ * @param {number} id - User ID to delete
+ */
+function deleteUser(id) { 
+  if (confirm('⚠️ Delete this user permanently?')) { 
+    users = users.filter(u => u.id !== id); 
+    localStorage.setItem('system_users', JSON.stringify(users)); 
+    renderUsers(); 
+    showToast('🗑️ User deleted', 'success'); 
+  } 
+}
+
+// ============================================
+// SECTION 16: PERMISSIONS MANAGEMENT
+// ============================================
+
+/**
+ * Load permissions configuration from localStorage
+ */
+function loadPermissionsConfig() {
+  const stored = localStorage.getItem('role_permissions');
+  if (stored) {
+    permissions = JSON.parse(stored);
+  } else {
+    permissions = [
+      { role: 'super_admin', permissions: ['full'] },
+      { role: 'manager', permissions: ['view_appointments', 'add_appointments', 'edit_appointments', 'manage_doctors', 'manage_services', 'reports'] },
+      { role: 'receptionist', permissions: ['view_appointments', 'add_appointments', 'edit_appointments'] }
+    ];
+    localStorage.setItem('role_permissions', JSON.stringify(permissions));
+  }
+}
+
+/**
+ * Load permissions UI for configuration
+ */
+function loadPermissionsUI() {
+  if (currentUserRole !== 'super_admin') { 
+    showPermissionDenied(); 
+    return; 
+  }
+  const container = document.getElementById('permissionsList');
+  if (!container) return;
+  
+  const allPermissions = [
+    { key: 'view_appointments', label: 'View Appointments', description: 'Can view all appointments' },
+    { key: 'add_appointments', label: 'Add Appointments', description: 'Can create new appointments' },
+    { key: 'edit_appointments', label: 'Edit Appointments', description: 'Can modify existing appointments' },
+    { key: 'manage_doctors', label: 'Manage Doctors', description: 'Can add, edit, delete doctors' },
+    { key: 'manage_services', label: 'Manage Services', description: 'Can add, edit, delete services' },
+    { key: 'reports', label: 'View Reports', description: 'Can access reports section' }
+  ];
+  
+  container.innerHTML = permissions.map(rolePerm => `
+    <div class="permission-group">
+      <h4><i class="fas fa-shield-alt"></i> ${rolePerm.role === 'super_admin' ? 'Super Admin' : (rolePerm.role === 'manager' ? 'Manager' : 'Receptionist')} Permissions</h4>
+      ${allPermissions.map(perm => `
+        <div class="permission-item">
+          <input type="checkbox" id="perm_${rolePerm.role}_${perm.key}" data-role="${rolePerm.role}" data-perm="${perm.key}" 
+            ${rolePerm.permissions.includes(perm.key) || rolePerm.role === 'super_admin' ? 'checked' : ''} ${rolePerm.role === 'super_admin' ? 'disabled' : ''}>
+          <label for="perm_${rolePerm.role}_${perm.key}">
+            <strong><i class="fas fa-key"></i> ${perm.label}</strong> - ${perm.description}
+          </label>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+/**
+ * Save permissions configuration
+ */
+function savePermissions() {
+  const newPermissions = [];
+  document.querySelectorAll('.permission-item input[type="checkbox"]:not([disabled])').forEach(checkbox => {
+    const role = checkbox.getAttribute('data-role');
+    const perm = checkbox.getAttribute('data-perm');
+    let rolePerm = newPermissions.find(rp => rp.role === role);
+    if (!rolePerm) { 
+      rolePerm = { role: role, permissions: [] }; 
+      newPermissions.push(rolePerm); 
+    }
+    if (checkbox.checked) rolePerm.permissions.push(perm);
+  });
+  permissions = newPermissions;
+  localStorage.setItem('role_permissions', JSON.stringify(permissions));
+  showToast('✅ Permissions saved successfully!', 'success');
+}
+
+// ============================================
+// SECTION 17: SETTINGS & CONFIGURATION
+// ============================================
+
+/**
+ * Load settings from localStorage
+ */
 function loadSettings() {
   const settings = JSON.parse(localStorage.getItem('clinic_settings') || '{}');
   const nameEl = document.getElementById('clinicName'); if(nameEl) nameEl.value = settings.clinicName || 'VET FOR PET CLINIC';
@@ -789,74 +1246,167 @@ function loadSettings() {
   const emailEl = document.getElementById('clinicEmail'); if(emailEl) emailEl.value = settings.clinicEmail || 'info@vetforpet.com';
 }
 
+/**
+ * Save clinic settings to localStorage
+ */
 function saveSettings() {
-  const settings = { clinicName: document.getElementById('clinicName')?.value || '', clinicAddress: document.getElementById('clinicAddress')?.value || '', clinicPhone: document.getElementById('clinicPhone')?.value || '', clinicEmergency: document.getElementById('clinicEmergency')?.value || '', clinicEmail: document.getElementById('clinicEmail')?.value || '' };
+  const settings = { 
+    clinicName: document.getElementById('clinicName')?.value, 
+    clinicAddress: document.getElementById('clinicAddress')?.value, 
+    clinicPhone: document.getElementById('clinicPhone')?.value, 
+    clinicEmergency: document.getElementById('clinicEmergency')?.value, 
+    clinicEmail: document.getElementById('clinicEmail')?.value 
+  };
   localStorage.setItem('clinic_settings', JSON.stringify(settings));
-  showToast('Settings saved', 'success');
+  showToast('✅ Settings saved successfully!', 'success');
 }
 
+/**
+ * Load slot configuration from localStorage
+ */
 function loadSlotConfig() {
-  const defaultConfig = { Saturday: { start: 9, end: 21 }, Sunday: { start: 9, end: 15 }, Monday: { start: 9, end: 15 }, Tuesday: { start: 9, end: 21 }, Wednesday: { start: 9, end: 15 }, Thursday: { start: 9, end: 15 }, Friday: { start: 9, end: 15 } };
+  const defaultConfig = { 
+    Saturday: { start: 9, end: 21 }, 
+    Sunday: { start: 9, end: 15 }, 
+    Monday: { start: 9, end: 15 }, 
+    Tuesday: { start: 9, end: 21 }, 
+    Wednesday: { start: 9, end: 15 }, 
+    Thursday: { start: 9, end: 15 }, 
+    Friday: { start: 9, end: 15 } 
+  };
   const config = JSON.parse(localStorage.getItem('slot_config') || JSON.stringify(defaultConfig));
   const container = document.getElementById('slotConfig');
   if (!container) return;
-  container.innerHTML = Object.entries(config).map(([day, cfg]) => `<div class="slot-item"><label>${day}</label><input type="number" id="${day}_start" value="${cfg.start}" min="0" max="23" class="slot-input"> - <input type="number" id="${day}_end" value="${cfg.end}" min="0" max="23" class="slot-input"></div>`).join('');
+  container.innerHTML = Object.entries(config).map(([day, cfg]) => `
+    <div class="slot-item">
+      <label><i class="fas fa-calendar"></i> ${day}</label>
+      <input type="number" id="${day}_start" value="${cfg.start}" min="0" max="23" class="slot-input"> - 
+      <input type="number" id="${day}_end" value="${cfg.end}" min="0" max="23" class="slot-input">
+    </div>
+  `).join('');
 }
 
+/**
+ * Save slot configuration to localStorage
+ */
 function saveSlotConfig() {
   const newConfig = {};
   const days = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  days.forEach(day => { const startEl = document.getElementById(`${day}_start`); const endEl = document.getElementById(`${day}_end`); newConfig[day] = { start: startEl ? parseInt(startEl.value) || 9 : 9, end: endEl ? parseInt(endEl.value) || 17 : 17 }; });
+  days.forEach(day => { 
+    const startEl = document.getElementById(`${day}_start`); 
+    const endEl = document.getElementById(`${day}_end`); 
+    newConfig[day] = { 
+      start: startEl ? parseInt(startEl.value) || 9 : 9, 
+      end: endEl ? parseInt(endEl.value) || 17 : 17 
+    }; 
+  });
   localStorage.setItem('slot_config', JSON.stringify(newConfig));
-  showToast('Slot config saved', 'success');
+  showToast('✅ Slot configuration saved!', 'success');
 }
 
+/**
+ * Load pricing configuration from localStorage
+ */
 function loadPricing() {
   const pricing = JSON.parse(localStorage.getItem('service_pricing') || '{}');
   const container = document.getElementById('pricingConfig');
   if (!container) return;
-  if (services.length > 0) { container.innerHTML = services.map(service => `<div class="slot-item"><label>${escapeHtml(service.name)}</label><input type="number" id="price_${service.id}" value="${pricing[service.id] || service.price || 500}" class="price-input" min="0"></div>`).join(''); }
-  else { container.innerHTML = '<p>Add services first</p>'; }
+  if (services.length > 0) { 
+    container.innerHTML = services.map(service => `
+      <div class="slot-item">
+        <label><i class="fas fa-money-bill-wave"></i> ${escapeHtml(service.name)}</label>
+        <input type="number" id="price_${service.id}" value="${pricing[service.id] || service.price || 500}" class="price-input" min="0">
+      </div>
+    `).join(''); 
+  } else { 
+    container.innerHTML = '<p><i class="fas fa-info-circle"></i> Add services first to set pricing</p>'; 
+  }
 }
 
+/**
+ * Save pricing configuration to localStorage
+ */
 function savePricing() {
   const pricing = {};
-  services.forEach(service => { const priceInput = document.getElementById(`price_${service.id}`); if(priceInput) pricing[service.id] = parseInt(priceInput.value) || 0; });
+  services.forEach(service => { 
+    const priceInput = document.getElementById(`price_${service.id}`); 
+    if(priceInput) pricing[service.id] = parseInt(priceInput.value) || 0; 
+  });
   localStorage.setItem('service_pricing', JSON.stringify(pricing));
-  showToast('Pricing saved', 'success');
+  showToast('✅ Pricing saved successfully!', 'success');
 }
 
 // ============================================
-// BACKUP & EXPORT
+// SECTION 18: BACKUP & EXPORT
 // ============================================
+
+/**
+ * Export appointments to CSV file
+ */
 function exportToCSV() {
-  if (!allAppointments.length) { showToast('No data to export', 'error'); return; }
+  if (!allAppointments.length) { 
+    showToast('❌ No data to export', 'error'); 
+    return; 
+  }
   let csv = "Date,Time,Token,Pet Name,Owner Name,Phone,Symptoms,Diagnosis,Prescription,Status\n";
-  allAppointments.forEach(a => { csv += `"${a.date}","${a.time}","${a.token}","${escapeCsv(a.petName)}","${escapeCsv(a.ownerName)}","${a.ownerPhone}","${escapeCsv(a.symptoms||'')}","${escapeCsv(a.diagnosis||'')}","${escapeCsv(a.prescription||'')}","${a.status||'Confirmed'}"\n`; });
+  allAppointments.forEach(a => { 
+    csv += `"${a.date}","${a.time}","${a.token}","${escapeCsv(a.petName)}","${escapeCsv(a.ownerName)}","${a.ownerPhone}","${escapeCsv(a.symptoms||'')}","${escapeCsv(a.diagnosis||'')}","${escapeCsv(a.prescription||'')}","${a.status||'Confirmed'}"\n`; 
+  });
   const blob = new Blob([csv], { type: 'text/csv' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `appointments_${getBangladeshDate()}.csv`;
   link.click();
-  showToast('CSV exported', 'success');
+  showToast('📄 CSV exported successfully!', 'success');
 }
 
-function escapeCsv(str) { if(!str) return ''; return str.replace(/"/g, '""'); }
+/**
+ * Escape string for CSV export
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeCsv(str) { 
+  if(!str) return ''; 
+  return str.replace(/"/g, '""'); 
+}
 
+/**
+ * Download full backup as JSON file
+ */
 function backupData() {
-  const backup = { appointments: allAppointments, doctors: doctors, services: services, settings: localStorage.getItem('clinic_settings'), slotConfig: localStorage.getItem('slot_config'), pricing: localStorage.getItem('service_pricing'), date: new Date().toISOString() };
+  const backup = { 
+    appointments: allAppointments, 
+    doctors: doctors, 
+    services: services, 
+    users: users, 
+    permissions: permissions, 
+    settings: localStorage.getItem('clinic_settings'), 
+    slotConfig: localStorage.getItem('slot_config'), 
+    pricing: localStorage.getItem('service_pricing'), 
+    date: new Date().toISOString() 
+  };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `backup_${getBangladeshDate()}.json`;
+  link.download = `vet_clinic_backup_${getBangladeshDate()}.json`;
   link.click();
   localStorage.setItem('lastBackup', new Date().toLocaleString());
   const lastBackupSpan = document.getElementById('lastBackup');
   if (lastBackupSpan) lastBackupSpan.innerText = new Date().toLocaleString();
-  showToast('Backup downloaded', 'success');
+  showToast('💾 Backup downloaded successfully!', 'success');
 }
 
-function triggerRestore() { const rf = document.getElementById('restoreFile'); if(rf) rf.click(); }
+/**
+ * Trigger restore file picker
+ */
+function triggerRestore() { 
+  const rf = document.getElementById('restoreFile'); 
+  if(rf) rf.click(); 
+}
+
+/**
+ * Restore from backup file
+ */
 document.getElementById('restoreFile')?.addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -864,23 +1414,56 @@ document.getElementById('restoreFile')?.addEventListener('change', function(e) {
   reader.onload = function(ev) {
     try {
       const data = JSON.parse(ev.target.result);
-      if (data.appointments) { const bookings = {}; data.appointments.forEach(a => { if (!bookings[a.date]) bookings[a.date] = []; bookings[a.date].push(a.timeSlot); }); localStorage.setItem('vet_bookings', JSON.stringify(bookings)); allAppointments = data.appointments; refreshAllData(); }
-      if (data.doctors) { localStorage.setItem('clinic_doctors', JSON.stringify(data.doctors)); doctors = data.doctors; renderDoctors(); }
-      if (data.services) { localStorage.setItem('clinic_services', JSON.stringify(data.services)); services = data.services; renderServices(); }
+      if (data.appointments) { 
+        const bookings = {}; 
+        data.appointments.forEach(a => { 
+          if (!bookings[a.date]) bookings[a.date] = []; 
+          bookings[a.date].push(a.timeSlot); 
+        }); 
+        localStorage.setItem('vet_bookings', JSON.stringify(bookings)); 
+        allAppointments = data.appointments; 
+        refreshAllData(); 
+      }
+      if (data.doctors) { 
+        localStorage.setItem('clinic_doctors', JSON.stringify(data.doctors)); 
+        doctors = data.doctors; 
+        renderDoctors(); 
+      }
+      if (data.services) { 
+        localStorage.setItem('clinic_services', JSON.stringify(data.services)); 
+        services = data.services; 
+        renderServices(); 
+      }
+      if (data.users && currentUserRole === 'super_admin') { 
+        localStorage.setItem('system_users', JSON.stringify(data.users)); 
+        users = data.users; 
+        renderUsers(); 
+      }
+      if (data.permissions && currentUserRole === 'super_admin') { 
+        localStorage.setItem('role_permissions', JSON.stringify(data.permissions)); 
+        permissions = data.permissions; 
+      }
       if (data.settings) localStorage.setItem('clinic_settings', data.settings);
       if (data.slotConfig) localStorage.setItem('slot_config', data.slotConfig);
       if (data.pricing) localStorage.setItem('service_pricing', data.pricing);
-      showToast('Restore successful!', 'success');
+      showToast('✅ Restore successful! Refreshing...', 'success');
       setTimeout(() => location.reload(), 1500);
-    } catch(err) { showToast('Invalid backup', 'error'); }
+    } catch(err) { 
+      showToast('❌ Invalid backup file', 'error'); 
+    }
   };
   reader.readAsText(file);
 });
 
 // ============================================
-// REPORTS
+// SECTION 19: REPORTS & CHARTS
 // ============================================
+
+/**
+ * Update report statistics
+ */
 function updateReportStats() {
+  if (!hasPermission('reports')) return;
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   const weeklyApps = allAppointments.filter(a => new Date(a.date) >= weekAgo);
   const weeklyElem = document.getElementById('weeklyCount'); if(weeklyElem) weeklyElem.innerText = weeklyApps.length;
@@ -894,93 +1477,152 @@ function updateReportStats() {
   createWeeklyChart();
 }
 
+/**
+ * Create weekly appointments chart
+ */
 function createWeeklyChart() {
   const last7Days = [];
-  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); last7Days.push(d.toISOString().split('T')[0]); }
-  const counts = last7Days.map(d => allAppointments.filter(a => a.date === d).length);
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    last7Days.push(date.toISOString().split('T')[0]);
+  }
+  const counts = last7Days.map(date => allAppointments.filter(a => a.date === date).length);
   const ctx = document.getElementById('weeklyChart')?.getContext('2d');
   if (!ctx) return;
   if (adminChart) adminChart.destroy();
-  adminChart = new Chart(ctx, { type: 'bar', data: { labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short' })), datasets: [{ label: 'Appointments', data: counts, backgroundColor: '#f97316', borderRadius: 8 }] }, options: { responsive: true, plugins: { legend: { display: false } } } });
+  adminChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })),
+      datasets: [{ label: '📊 Appointments', data: counts, backgroundColor: '#f97316', borderRadius: 8 }]
+    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+  });
 }
 
+/**
+ * Load report based on type and date
+ */
 async function loadReport() {
+  if (!hasPermission('reports')) { 
+    showPermissionDenied(); 
+    return; 
+  }
   const type = document.getElementById('reportType')?.value || 'daily';
   const date = document.getElementById('reportDate')?.value || getBangladeshDate();
   let filtered = allAppointments;
   let title = '';
-  if (type === 'daily') { filtered = allAppointments.filter(a => a.date === date); title = `Daily Report - ${date}`; }
-  else if (type === 'weekly') { const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7); filtered = allAppointments.filter(a => new Date(a.date) >= weekAgo); title = 'Weekly Report'; }
-  else if (type === 'monthly') { const monthAgo = new Date(); monthAgo.setMonth(monthAgo.getMonth() - 1); filtered = allAppointments.filter(a => new Date(a.date) >= monthAgo); title = 'Monthly Report'; }
-  else { const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1); filtered = allAppointments.filter(a => new Date(a.date) >= yearAgo); title = 'Yearly Report'; }
+  if (type === 'daily') { 
+    filtered = allAppointments.filter(a => a.date === date); 
+    title = `📅 Daily Report - ${date}`; 
+  } else if (type === 'weekly') { 
+    const weekAgo = new Date(); 
+    weekAgo.setDate(weekAgo.getDate() - 7); 
+    filtered = allAppointments.filter(a => new Date(a.date) >= weekAgo); 
+    title = '📊 Weekly Report'; 
+  } else if (type === 'monthly') { 
+    const monthAgo = new Date(); 
+    monthAgo.setMonth(monthAgo.getMonth() - 1); 
+    filtered = allAppointments.filter(a => new Date(a.date) >= monthAgo); 
+    title = '📈 Monthly Report'; 
+  } else { 
+    const yearAgo = new Date(); 
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1); 
+    filtered = allAppointments.filter(a => new Date(a.date) >= yearAgo); 
+    title = '📉 Yearly Report'; 
+  }
   const container = document.getElementById('reportContainer');
   if (!container) return;
-  container.innerHTML = `<div class="report-summary"><h3>${title}</h3><p>Total: ${filtered.length} | Completed: ${filtered.filter(a => a.status === 'Completed').length} | Pending: ${filtered.filter(a => a.status !== 'Completed').length}</p><div class="report-list"><table class="report-table"><thead><tr><th>Date</th><th>Pet</th><th>Owner</th><th>Status</th></tr></thead><tbody>${filtered.slice(0,20).map(a => `<tr><td>${a.date}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td>${a.status || 'Confirmed'}</td></tr>`).join('')}</tbody></table>${filtered.length > 20 ? '<p>... and more</p>' : ''}</div></div>`;
+  container.innerHTML = `
+    <div class="report-summary">
+      <h3><i class="fas fa-chart-line"></i> ${title}</h3>
+      <p><i class="fas fa-calendar"></i> Total: ${filtered.length} | <i class="fas fa-check-circle"></i> Completed: ${filtered.filter(a => a.status === 'Completed').length} | <i class="fas fa-clock"></i> Pending: ${filtered.filter(a => a.status !== 'Completed').length}</p>
+      <div class="report-list">
+        <table class="report-table">
+          <thead><tr><th><i class="fas fa-calendar"></i> Date</th><th><i class="fas fa-paw"></i> Pet</th><th><i class="fas fa-user"></i> Owner</th><th><i class="fas fa-flag-checkered"></i> Status</th></tr></thead>
+          <tbody>
+            ${filtered.slice(0, 20).map(a => `
+              <tr><td>${a.date}侧<td><i class="fas fa-paw"></i> ${escapeHtml(a.petName)}侧<td><i class="fas fa-user"></i> ${escapeHtml(a.ownerName)}侧<td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span>侧)`).join('')}
+          </tbody>
+        </table>
+        ${filtered.length > 20 ? '<p><i class="fas fa-ellipsis-h"></i> ... and more</p>' : ''}
+      </div>
+    </div>
+  `;
 }
 
+/**
+ * Print report
+ */
 function printReport() {
   const container = document.getElementById('reportContainer');
   if (!container) return;
   const win = window.open('', '_blank');
   win.document.write(`<html><head><title>Report</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}</style></head><body>${container.innerHTML}</body></html>`);
-  win.document.close(); win.print();
+  win.document.close(); 
+  win.print();
+  showToast('🖨️ Report sent to printer', 'success');
 }
 
+/**
+ * Print all appointments
+ */
 function printAllAppointments() {
   const win = window.open('', '_blank');
-  win.document.write(`<html><head><title>All Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2>VET FOR PET CLINIC - All Appointments</h2><p>Generated: ${new Date().toLocaleString()}</p><td><thead><tr><th>Date</th><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead><tbody>${allAppointments.map(a => `<tr><td>${a.date}</td><td>${a.time}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td>${a.token}</td><td>${a.status || 'Confirmed'}</td></tr>`).join('')}</tbody></table></body></html>`);
-  win.document.close(); win.print();
+  win.document.write(`<!DOCTYPE html><html><head><title>All Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2><i class="fas fa-clinic-medical"></i> VET FOR PET CLINIC - All Appointments</h2><p>Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th><i class="fas fa-calendar"></i> Date</th><th><i class="fas fa-clock"></i> Time</th><th><i class="fas fa-paw"></i> Pet</th><th><i class="fas fa-user"></i> Owner</th><th><i class="fas fa-ticket-alt"></i> Token</th><th><i class="fas fa-flag-checkered"></i> Status</th></tr></thead><tbody>${allAppointments.map(a => `<tr><td>${a.date}侧<td>${a.time}侧<td><i class="fas fa-paw"></i> ${escapeHtml(a.petName)}侧<td><i class="fas fa-user"></i> ${escapeHtml(a.ownerName)}侧<td>${a.token}侧<td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span>侧)`).join('')}</tbody></table></body></html>`);
+  win.document.close(); 
+  win.print();
+  showToast('🖨️ All appointments sent to printer', 'success');
 }
 
 // ============================================
-// MODAL FUNCTIONS (Logout, View)
+// SECTION 20: LOGOUT FUNCTIONS
 // ============================================
-function showLogoutModal() { const m = document.getElementById('logoutModal'); if(m) { m.classList.add('show'); m.style.display = 'flex'; } }
-function closeLogoutModal() { const m = document.getElementById('logoutModal'); if(m) { m.classList.remove('show'); m.style.display = 'none'; } }
-function confirmLogout() { if (autoSyncInterval) clearInterval(autoSyncInterval); sessionStorage.clear(); window.location.href = 'admin-login.html'; }
 
-function viewAppointment(bookingId) {
-  const app = allAppointments.find(a => a.bookingId === bookingId);
-  if (!app) return;
-  const modal = document.getElementById('viewAppointmentModal');
-  const detailsDiv = document.getElementById('appointmentDetails');
-  if (!modal || !detailsDiv) return;
-  detailsDiv.innerHTML = `
-    <div class="appointment-full-details">
-      <div class="detail-row"><strong>🆔 Token:</strong> ${app.token}</div>
-      <div class="detail-row"><strong>📅 Date:</strong> ${app.date}</div>
-      <div class="detail-row"><strong>⏰ Time:</strong> ${app.time}</div>
-      <div class="detail-row"><strong>🐾 Pet Name:</strong> ${escapeHtml(app.petName)}</div>
-      <div class="detail-row"><strong>🎂 Pet Age:</strong> ${app.petAge || 'N/A'}</div>
-      <div class="detail-row"><strong>⚖️ Weight:</strong> ${app.weight || 'N/A'} kg</div>
-      <div class="detail-row"><strong>👤 Owner Name:</strong> ${escapeHtml(app.ownerName)}</div>
-      <div class="detail-row"><strong>📞 Phone:</strong> ${app.ownerPhone}</div>
-      <div class="detail-row"><strong>📋 Symptoms:</strong> ${escapeHtml(app.symptoms || 'N/A')}</div>
-      <div class="detail-row"><strong>🩺 Diagnosis:</strong> ${escapeHtml(app.diagnosis || 'N/A')}</div>
-      <div class="detail-row"><strong>💊 Prescription:</strong><br>${escapeHtml(app.prescription || 'N/A')}</div>
-      <div class="detail-row"><strong>📝 Treatment Plan:</strong> ${escapeHtml(app.treatmentPlan || 'N/A')}</div>
-      <div class="detail-row"><strong>📅 Follow-up Date:</strong> ${app.followUpDate || 'N/A'}</div>
-      <div class="detail-row"><strong>✅ Status:</strong> <span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span></div>
-    </div>
-  `;
-  modal.classList.add('show');
-  modal.style.display = 'flex';
-  window.currentViewBookingId = bookingId;
+/**
+ * Show logout confirmation modal
+ */
+function showLogoutModal() { 
+  const modal = document.getElementById('logoutModal'); 
+  if (modal) { 
+    modal.classList.add('show'); 
+    modal.style.display = 'flex'; 
+  } 
 }
 
-function closeViewAppointmentModal() { const m = document.getElementById('viewAppointmentModal'); if(m) { m.classList.remove('show'); m.style.display = 'none'; } }
-function deleteAppointmentFromModal() { deleteAppointment(window.currentViewBookingId); closeViewAppointmentModal(); }
+/**
+ * Close logout confirmation modal
+ */
+function closeLogoutModal() { 
+  const modal = document.getElementById('logoutModal'); 
+  if (modal) { 
+    modal.classList.remove('show'); 
+    modal.style.display = 'none'; 
+  } 
+}
+
+/**
+ * Confirm logout and redirect to login page
+ */
+function confirmLogout() { 
+  if (autoSyncInterval) clearInterval(autoSyncInterval); 
+  sessionStorage.clear(); 
+  window.location.href = 'admin-login.html'; 
+}
 
 // ============================================
-// UTILITIES
+// SECTION 21: UTILITY FUNCTIONS
 // ============================================
-function escapeHtml(t) { if(!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-function showToast(msg, type) {
-  let toast = document.getElementById('toast');
-  if (!toast) { toast = document.createElement('div'); toast.id = 'toast'; toast.className = 'toast-notification'; document.body.appendChild(toast); toast.style.cssText = 'position:fixed;bottom:30px;right:30px;padding:12px 24px;border-radius:50px;color:white;z-index:9999;transition:0.3s'; }
-  toast.style.background = type === 'success' ? '#15803d' : '#ef4444';
-  toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${msg}`;
-  toast.style.transform = 'translateX(0)';
-  setTimeout(() => { if(toast) toast.style.transform = 'translateX(400px)'; }, 3000);
+/**
+ * Escape HTML to prevent XSS attacks
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) { 
+  if (!text) return ''; 
+  const div = document.createElement('div'); 
+  div.textContent = text; 
+  return div.innerHTML; 
 }

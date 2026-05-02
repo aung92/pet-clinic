@@ -1,153 +1,557 @@
 // ============================================
-// ADMIN DASHBOARD - COMPLETE SCRIPT
-// Auto Sync | Full Control | A to Z Workable
+// DOCTOR DASHBOARD - COMPLETE SCRIPT
+// ============================================
+// Version: 2.1
+// Author: VET FOR PET CLINIC
+// Description: Modern & Dynamic Doctor Portal with Bangladesh Time Zone
+// Last Updated: 2025
 // ============================================
 
+// ============================================
+// SECTION 1: CONFIGURATION & GLOBAL VARIABLES
+// ============================================
+
+// Google Apps Script URL for backend API
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
 
-let allAppointments = [];
-let doctors = [];
-let services = [];
-let currentPage = 1;
-let itemsPerPage = 20;
-let adminChart = null;
-let autoSyncInterval = null;
+// Global state variables
+let allAppointments = [];           // All appointments data
+let currentModalBookingId = null;   // Currently selected booking ID for medical modal
+let currentViewBookingId = null;    // Currently selected booking ID for view modal
+let currentPage = 1;                // Current page for pagination
+let itemsPerPage = 10;              // Number of items per page
+let doctorChart = null;             // Chart.js instance for doctor report
+
+// Default slot configuration (load from localStorage if available)
+const DEFAULT_SLOT_CONFIG = {
+  "Saturday": { start: 9, end: 21 },
+  "Sunday": { start: 9, end: 15 },
+  "Monday": { start: 9, end: 15 },
+  "Tuesday": { start: 9, end: 21 },
+  "Wednesday": { start: 9, end: 15 },
+  "Thursday": { start: 9, end: 15 },
+  "Friday": { start: 9, end: 15 }
+};
+
+// Dynamic slot configuration
+let slotConfig = { ...DEFAULT_SLOT_CONFIG };
+
+// DOM element cache for performance
+const domCache = {};
+
+/**
+ * Get DOM element with caching for better performance
+ * @param {string} id - Element ID
+ * @returns {HTMLElement} DOM element
+ */
+function getElement(id) {
+  if (!domCache[id]) {
+    domCache[id] = document.getElementById(id);
+  }
+  return domCache[id];
+}
 
 // ============================================
-// BANGLADESH TIME ZONE (UTC+6)
+// SECTION 2: BANGLADESH TIME ZONE (UTC+6)
 // ============================================
+
+/**
+ * Get current time in Bangladesh Time Zone (UTC+6)
+ * @returns {Date} Current date and time in Bangladesh
+ */
 function getBangladeshTime() {
   const now = new Date();
   const bangladeshTime = new Date(now.getTime() + (6 * 60 * 60 * 1000));
   return bangladeshTime;
 }
 
+/**
+ * Get current date in Bangladesh Time Zone formatted as YYYY-MM-DD
+ * @returns {string} Formatted date string
+ */
 function getBangladeshDate() {
   const bdTime = getBangladeshTime();
   return `${bdTime.getFullYear()}-${String(bdTime.getMonth() + 1).padStart(2, '0')}-${String(bdTime.getDate()).padStart(2, '0')}`;
 }
 
 // ============================================
-// AUTHENTICATION CHECK
+// SECTION 3: AUTHENTICATION CHECK
 // ============================================
+
+/**
+ * Check if doctor is logged in, redirect to login page if not
+ */
 (function() {
-  const isLoggedIn = sessionStorage.getItem('admin_logged_in');
-  if (!isLoggedIn || isLoggedIn !== 'true') {
-    window.location.href = 'admin-login.html';
+  const doctorLoggedIn = sessionStorage.getItem('doctor_logged_in');
+  if (!doctorLoggedIn || doctorLoggedIn !== 'true') {
+    window.location.href = 'doctor-login.html';
     return;
   }
   
-  const adminName = sessionStorage.getItem('admin_name') || 'Admin';
-  const adminRole = sessionStorage.getItem('admin_role') || 'Administrator';
+  const doctorName = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh';
+  const doctorRole = sessionStorage.getItem('doctor_role') || 'Senior Veterinarian';
   
-  document.getElementById('welcomeName').innerText = adminName;
-  document.getElementById('adminName').innerText = adminName;
-  document.getElementById('adminRole').innerText = adminRole;
+  const welcomeName = getElement('welcomeName');
+  const doctorNameSpan = getElement('doctorName');
+  const doctorRoleSpan = getElement('doctorRole');
+  
+  if (welcomeName) welcomeName.innerText = doctorName.split(' ')[0];
+  if (doctorNameSpan) doctorNameSpan.innerText = doctorName;
+  if (doctorRoleSpan) doctorRoleSpan.innerText = doctorRole;
 })();
 
 // ============================================
-// INITIALIZATION
+// SECTION 4: SLOT CONFIGURATION MANAGEMENT
 // ============================================
-document.addEventListener('DOMContentLoaded', function() {
-  updateDateTime();
-  setInterval(updateDateTime, 1000);
-  
-  setupNavigation();
-  loadAllData();
-  loadDoctors();
-  loadServices();
-  loadSettings();
-  loadSlotConfig();
-  loadPricing();
-  
-  // Setup auto sync every 15 seconds
-  startAutoSync();
-  
-  // Setup refresh button
-  const refreshBtn = document.querySelector('.refresh-btn');
-  if (refreshBtn) refreshBtn.onclick = () => refreshAllData();
-  
-  // Setup report date picker
-  const reportDate = document.getElementById('reportDate');
-  if (reportDate) reportDate.value = getBangladeshDate();
-});
 
-function updateDateTime() {
-  const bdTime = getBangladeshTime();
-  document.getElementById('currentDate').innerText = bdTime.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-  });
-  document.getElementById('currentTime').innerText = bdTime.toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit'
-  });
-}
-
-// ============================================
-// AUTO SYNC FUNCTION
-// ============================================
-function startAutoSync() {
-  if (autoSyncInterval) clearInterval(autoSyncInterval);
-  autoSyncInterval = setInterval(async () => {
-    await autoSyncData();
-  }, 15000); // Sync every 15 seconds
-}
-
-async function autoSyncData() {
-  try {
-    const response = await fetch(`${SCRIPT_URL}?action=getAppointments&t=${Date.now()}`);
-    const text = await response.text();
-    const jsonStr = text.match(/\((.*)\)/)[1];
-    const data = JSON.parse(jsonStr);
-    
-    if (data && data.appointments) {
-      const oldCount = allAppointments.length;
-      allAppointments = data.appointments;
-      
-      // Update UI
-      updateDashboardStats();
-      loadRecentAppointments();
-      updateQuickStats();
-      
-      // Update appointment badge
-      const today = getBangladeshDate();
-      const todayCount = allAppointments.filter(a => a.date === today).length;
-      const badge = document.getElementById('appointmentBadge');
-      if (badge) badge.innerText = todayCount;
-      
-      // Update total records
-      const totalRecords = document.getElementById('totalRecords');
-      if (totalRecords) totalRecords.innerText = allAppointments.length;
-      
-      // Show sync status
-      const syncStatus = document.getElementById('syncStatus');
-      if (syncStatus) {
-        syncStatus.innerHTML = `<i class="fas fa-check-circle"></i> Synced at ${new Date().toLocaleTimeString()}`;
-        syncStatus.style.opacity = '1';
-        setTimeout(() => { syncStatus.style.opacity = '0'; }, 2000);
-      }
-      
-      // Reload current page if on appointments view
-      if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
-        loadAllAppointmentsList();
-      }
-      
-      console.log('Auto sync completed. Total appointments:', allAppointments.length);
+/**
+ * Load slot configuration from localStorage
+ * If admin has changed slots, it will be reflected here
+ */
+function loadSlotConfig() {
+  const savedConfig = localStorage.getItem('slot_config');
+  if (savedConfig) {
+    try {
+      slotConfig = JSON.parse(savedConfig);
+      console.log('✅ Slot config loaded from localStorage:', slotConfig);
+    } catch (error) {
+      console.error('❌ Error parsing slot config:', error);
+      slotConfig = { ...DEFAULT_SLOT_CONFIG };
     }
-  } catch (error) {
-    console.error('Auto sync error:', error);
+  } else {
+    slotConfig = { ...DEFAULT_SLOT_CONFIG };
+    console.log('📋 Using default slot configuration');
   }
 }
 
-function refreshAllData() {
-  autoSyncData();
-  loadDoctors();
-  loadServices();
-  showToast('All data refreshed successfully!', 'success');
+/**
+ * Generate time slots based on day using dynamic config
+ * @param {string} dayName - Name of the day (e.g., "Monday")
+ * @returns {Array} Array of time slots
+ */
+function generateTimeSlots(dayName) {
+  const cfg = slotConfig[dayName];
+  if (!cfg) return [];
+  
+  const slots = [];
+  let hour = cfg.start;
+  let minute = 0;
+  
+  while (hour < cfg.end || (hour === cfg.end && minute === 0)) {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    let displayHour = hour % 12;
+    if (displayHour === 0) displayHour = 12;
+    
+    slots.push(`${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`);
+    minute += 30;
+    if (minute >= 60) {
+      hour++;
+      minute = 0;
+    }
+  }
+  
+  return slots;
 }
 
 // ============================================
-// API CALLS
+// SECTION 5: PROFILE DATA MANAGEMENT
 // ============================================
+
+/**
+ * Load and display doctor profile data from sessionStorage
+ */
+function loadProfileData() {
+  const profileName = getElement('profileName');
+  const profileEmail = getElement('profileEmail');
+  const profileRole = getElement('profileRole');
+  const profileSpecialization = getElement('profileSpecialization');
+  const profilePhone = getElement('profilePhone');
+  const profileSchedule = getElement('profileSchedule');
+  const profileJoined = getElement('profileJoined');
+  
+  if (profileName) profileName.innerText = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh Tripura';
+  if (profileEmail) profileEmail.innerText = sessionStorage.getItem('doctor_email') || 'doctor@vetforpet.com';
+  if (profileRole) profileRole.innerText = sessionStorage.getItem('doctor_role') || 'Senior Veterinarian';
+  if (profileSpecialization) profileSpecialization.innerText = sessionStorage.getItem('doctor_specialization') || 'General Veterinary';
+  if (profilePhone) profilePhone.innerText = sessionStorage.getItem('doctor_phone') || '01406779238';
+  if (profileSchedule) profileSchedule.innerText = sessionStorage.getItem('doctor_schedule') || 'Sat-Wed 9AM-9PM';
+  if (profileJoined) profileJoined.innerText = '2024';
+}
+
+// ============================================
+// SECTION 6: PROFILE IMAGE UPLOAD FUNCTIONS
+// ============================================
+
+/**
+ * Open file picker for avatar upload
+ */
+function openAvatarUploadModal() {
+  const fileInput = getElement('profileImageUpload');
+  if (fileInput) {
+    fileInput.click();
+  } else {
+    showToast('Image upload feature coming soon!', 'info');
+  }
+}
+
+/**
+ * Load profile image from localStorage and display it
+ */
+function loadProfileImage() {
+  const savedImage = localStorage.getItem('doctor_profile_image');
+  const avatarImg = getElement('profileAvatarImg');
+  const avatarIcon = getElement('avatarIcon');
+  const editAvatarImg = getElement('editAvatarImg');
+  const editAvatarIcon = getElement('editAvatarIcon');
+  
+  if (savedImage && savedImage !== '') {
+    if (avatarImg) {
+      avatarImg.src = savedImage;
+      avatarImg.style.display = 'block';
+      if (avatarIcon) avatarIcon.style.display = 'none';
+    }
+    if (editAvatarImg) {
+      editAvatarImg.src = savedImage;
+      editAvatarImg.style.display = 'block';
+      if (editAvatarIcon) editAvatarIcon.style.display = 'none';
+    }
+  } else {
+    if (avatarImg) {
+      avatarImg.src = '';
+      avatarImg.style.display = 'none';
+      if (avatarIcon) avatarIcon.style.display = 'flex';
+    }
+    if (editAvatarImg) {
+      editAvatarImg.src = '';
+      editAvatarImg.style.display = 'none';
+      if (editAvatarIcon) editAvatarIcon.style.display = 'flex';
+    }
+  }
+}
+
+/**
+ * Setup image upload event listener
+ */
+function setupImageUpload() {
+  const fileInput = getElement('profileImageUpload');
+  if (!fileInput) return;
+  
+  // Remove existing listener to avoid duplicates
+  const newFileInput = fileInput.cloneNode(true);
+  fileInput.parentNode.replaceChild(newFileInput, fileInput);
+  
+  newFileInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      showToast('Please select a valid image (JPG, PNG, GIF, WEBP)', 'error');
+      return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Image size should be less than 2MB', 'error');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const imageData = ev.target.result;
+      
+      // Update preview in edit modal
+      const editAvatarImg = getElement('editAvatarImg');
+      const editAvatarIcon = getElement('editAvatarIcon');
+      if (editAvatarImg) {
+        editAvatarImg.src = imageData;
+        editAvatarImg.style.display = 'block';
+        if (editAvatarIcon) editAvatarIcon.style.display = 'none';
+      }
+      
+      // Update main profile preview
+      const profileAvatarImg = getElement('profileAvatarImg');
+      const avatarIcon = getElement('avatarIcon');
+      if (profileAvatarImg) {
+        profileAvatarImg.src = imageData;
+        profileAvatarImg.style.display = 'block';
+        if (avatarIcon) avatarIcon.style.display = 'none';
+      }
+      
+      // Store temporarily
+      window.tempProfileImage = imageData;
+      showToast('Image uploaded successfully! Click Save to update profile.', 'success');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Remove profile image
+ */
+function removeProfileImage() {
+  if (confirm('Are you sure you want to remove your profile picture?')) {
+    const editAvatarImg = getElement('editAvatarImg');
+    const editAvatarIcon = getElement('editAvatarIcon');
+    const profileAvatarImg = getElement('profileAvatarImg');
+    const avatarIcon = getElement('avatarIcon');
+    
+    if (editAvatarImg) {
+      editAvatarImg.src = '';
+      editAvatarImg.style.display = 'none';
+      if (editAvatarIcon) editAvatarIcon.style.display = 'flex';
+    }
+    
+    if (profileAvatarImg) {
+      profileAvatarImg.src = '';
+      profileAvatarImg.style.display = 'none';
+      if (avatarIcon) avatarIcon.style.display = 'flex';
+    }
+    
+    window.tempProfileImage = null;
+    showToast('Profile image removed', 'success');
+  }
+}
+
+// ============================================
+// SECTION 7: EDIT PROFILE FUNCTIONS
+// ============================================
+
+/**
+ * Open edit profile modal with current data
+ */
+function openEditProfileModal() {
+  const editName = getElement('editProfileName');
+  const editEmail = getElement('editProfileEmail');
+  const editSpecialization = getElement('editProfileSpecialization');
+  const editPhone = getElement('editProfilePhone');
+  const editSchedule = getElement('editProfileSchedule');
+  const editPassword = getElement('editProfilePassword');
+  
+  if (editName) editName.value = sessionStorage.getItem('doctor_name') || '';
+  if (editEmail) editEmail.value = sessionStorage.getItem('doctor_email') || '';
+  if (editSpecialization) editSpecialization.value = sessionStorage.getItem('doctor_specialization') || '';
+  if (editPhone) editPhone.value = sessionStorage.getItem('doctor_phone') || '';
+  if (editSchedule) editSchedule.value = sessionStorage.getItem('doctor_schedule') || '';
+  if (editPassword) editPassword.value = '';
+  
+  const savedImage = localStorage.getItem('doctor_profile_image');
+  const editAvatarImg = getElement('editAvatarImg');
+  const editAvatarIcon = getElement('editAvatarIcon');
+  
+  if (savedImage && savedImage !== '') {
+    if (editAvatarImg) {
+      editAvatarImg.src = savedImage;
+      editAvatarImg.style.display = 'block';
+      if (editAvatarIcon) editAvatarIcon.style.display = 'none';
+    }
+  } else {
+    if (editAvatarImg) {
+      editAvatarImg.src = '';
+      editAvatarImg.style.display = 'none';
+      if (editAvatarIcon) editAvatarIcon.style.display = 'flex';
+    }
+  }
+  
+  window.tempProfileImage = null;
+  
+  const modal = getElement('editProfileModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+/**
+ * Close edit profile modal
+ */
+function closeEditProfileModal() {
+  const modal = getElement('editProfileModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+/**
+ * Save profile changes to localStorage and sessionStorage
+ */
+function saveProfileChanges() {
+  const newName = getElement('editProfileName')?.value || '';
+  const newEmail = getElement('editProfileEmail')?.value || '';
+  const newSpecialization = getElement('editProfileSpecialization')?.value || '';
+  const newPhone = getElement('editProfilePhone')?.value || '';
+  const newSchedule = getElement('editProfileSchedule')?.value || '';
+  const newPassword = getElement('editProfilePassword')?.value || '';
+  const newImage = window.tempProfileImage || null;
+
+  if (!newName || !newEmail) {
+    showToast('Please fill required fields', 'error');
+    return;
+  }
+
+  sessionStorage.setItem('doctor_name', newName);
+  sessionStorage.setItem('doctor_email', newEmail);
+  sessionStorage.setItem('doctor_specialization', newSpecialization);
+  sessionStorage.setItem('doctor_phone', newPhone);
+  sessionStorage.setItem('doctor_schedule', newSchedule);
+  if (newPassword) sessionStorage.setItem('doctor_password', newPassword);
+  
+  if (newImage) {
+    localStorage.setItem('doctor_profile_image', newImage);
+    window.tempProfileImage = null;
+  }
+
+  let doctors = JSON.parse(localStorage.getItem('clinic_doctors') || '[]');
+  const currentEmail = sessionStorage.getItem('doctor_email');
+  const index = doctors.findIndex(d => d.email === currentEmail);
+  
+  if (index !== -1) {
+    doctors[index] = {
+      ...doctors[index],
+      name: newName,
+      email: newEmail,
+      specialization: newSpecialization,
+      phone: newPhone,
+      schedule: newSchedule,
+      profileImage: newImage || doctors[index].profileImage
+    };
+    if (newPassword) doctors[index].password = newPassword;
+  } else {
+    doctors.push({
+      id: Date.now(),
+      name: newName,
+      email: newEmail,
+      specialization: newSpecialization,
+      phone: newPhone,
+      schedule: newSchedule,
+      password: newPassword || 'doctor123',
+      profileImage: newImage
+    });
+  }
+  localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
+
+  loadProfileData();
+  loadProfileImage();
+  
+  const doctorNameSpan = getElement('doctorName');
+  const welcomeNameSpan = getElement('welcomeName');
+  if (doctorNameSpan) doctorNameSpan.innerText = newName;
+  if (welcomeNameSpan) welcomeNameSpan.innerText = newName.split(' ')[0];
+  
+  closeEditProfileModal();
+  showToast('Profile updated successfully!', 'success');
+}
+
+// ============================================
+// SECTION 8: INITIALIZATION
+// ============================================
+
+/**
+ * Main initialization function - runs when page loads
+ */
+document.addEventListener('DOMContentLoaded', function() {
+  // Load slot configuration first
+  loadSlotConfig();
+  
+  updateDateTime();
+  setInterval(updateDateTime, 1000);
+  setupNavigation();
+  loadAllData();
+  loadProfileData();
+  loadProfileImage();
+  setupImageUpload();
+  
+  const todayPicker = getElement('todayDatePicker');
+  if (todayPicker) {
+    todayPicker.value = getBangladeshDate();
+    todayPicker.addEventListener('change', () => loadTodayAppointments());
+  }
+  
+  setupModalClose();
+});
+
+/**
+ * Update date and time display in header
+ */
+function updateDateTime() {
+  const bdTime = getBangladeshTime();
+  const dateElem = getElement('currentDate');
+  const timeElem = getElement('currentTime');
+  
+  if (dateElem) {
+    dateElem.innerText = bdTime.toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+    });
+  }
+  if (timeElem) {
+    timeElem.innerText = bdTime.toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+}
+
+// ============================================
+// SECTION 9: NAVIGATION
+// ============================================
+
+/**
+ * Setup sidebar navigation event listeners
+ */
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+  const pages = document.querySelectorAll('.page-content');
+  
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = item.getAttribute('data-page');
+      
+      navItems.forEach(nav => nav.classList.remove('active'));
+      item.classList.add('active');
+      
+      pages.forEach(p => p.classList.remove('active'));
+      const targetPage = getElement(page + 'Page');
+      if (targetPage) targetPage.classList.add('active');
+      
+      const pageTitle = getElement('pageTitle');
+      if (pageTitle) pageTitle.innerText = item.querySelector('span')?.innerText || page;
+      
+      if (page === 'today') loadTodayAppointments();
+      if (page === 'all') loadAllAppointments();
+      if (page === 'prescriptions') loadPrescriptions();
+      if (page === 'medical') loadMedicalRecords();
+      if (page === 'reports') loadDoctorReport();
+    });
+  });
+}
+
+/**
+ * Navigate to specific page by ID
+ * @param {string} pageId - ID of the page to navigate to
+ */
+function goToPage(pageId) {
+  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if (navItem) navItem.click();
+}
+
+/**
+ * Refresh all data
+ */
+function refreshAllData() {
+  loadAllData();
+  showToast('Data refreshed!', 'success');
+}
+
+// ============================================
+// SECTION 10: API CALLS
+// ============================================
+
+/**
+ * Fetch data from Google Apps Script API
+ * @param {string} action - API action name
+ * @param {Object} params - Additional parameters
+ * @returns {Promise<Object>} API response
+ */
 async function fetchFromAPI(action, params = {}) {
   try {
     let url = `${SCRIPT_URL}?action=${action}&t=${Date.now()}`;
@@ -165,116 +569,128 @@ async function fetchFromAPI(action, params = {}) {
   }
 }
 
-// ============================================
-// NAVIGATION
-// ============================================
-function setupNavigation() {
-  const navItems = document.querySelectorAll('.nav-item');
-  const pages = document.querySelectorAll('.page-content');
-  
-  navItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const page = item.getAttribute('data-page');
-      
-      navItems.forEach(nav => nav.classList.remove('active'));
-      item.classList.add('active');
-      
-      pages.forEach(p => p.classList.remove('active'));
-      const targetPage = document.getElementById(page + 'Page');
-      if (targetPage) targetPage.classList.add('active');
-      
-      document.getElementById('pageTitle').innerText = item.querySelector('span')?.innerText || page;
-      
-      if (page === 'appointments') loadAllAppointmentsList();
-      if (page === 'reports') { updateReportStats(); createWeeklyChart(); }
+/**
+ * Save medical information to Google Sheets
+ * @param {string} bookingId - Booking ID
+ * @param {Object} medicalData - Medical data to save
+ * @returns {Promise<boolean>} Success status
+ */
+async function saveMedicalInfo(bookingId, medicalData) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'updateMedicalInfo', bookingId, ...medicalData })
     });
-  });
-}
-
-function goToPage(pageId) {
-  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-  if (navItem) navItem.click();
-}
-
-// ============================================
-// LOAD APPOINTMENTS DATA (SYNC FROM SHEET)
-// ============================================
-async function loadAllData() {
-  showLoading('Loading data...');
-  
-  const data = await fetchFromAPI('getAppointments');
-  if (data && data.appointments) {
-    allAppointments = data.appointments;
-    console.log('Loaded appointments:', allAppointments.length);
-    
-    updateDashboardStats();
-    loadRecentAppointments();
-    updateQuickStats();
-    
-    // Update appointment badge
-    const today = getBangladeshDate();
-    const todayCount = allAppointments.filter(a => a.date === today).length;
-    const badge = document.getElementById('appointmentBadge');
-    if (badge) badge.innerText = todayCount;
-    
-    // Update total records
-    const totalRecords = document.getElementById('totalRecords');
-    if (totalRecords) totalRecords.innerText = allAppointments.length;
-    
-    // Also load appointments list if on that page
-    if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
-      loadAllAppointmentsList();
-    }
-  } else {
-    console.warn('No appointments data received');
-    showToast('Could not load data from server', 'error');
+    return true;
+  } catch (error) {
+    console.error('Save Error:', error);
+    return false;
   }
 }
 
+// ============================================
+// SECTION 11: LOAD & DISPLAY DATA
+// ============================================
+
+/**
+ * Load all appointment data from API
+ */
+async function loadAllData() {
+  const data = await fetchFromAPI('getAppointments');
+  if (data && data.appointments) {
+    allAppointments = data.appointments;
+    updateDashboardStats();
+    loadTodayPreview();
+    loadRecentActivity();
+    
+    const todayPicker = getElement('todayDatePicker');
+    if (todayPicker) loadTodayAppointments(todayPicker.value);
+  } else {
+    showToast('Could not load data', 'error');
+  }
+}
+
+/**
+ * Update dashboard statistics cards
+ */
 function updateDashboardStats() {
   const today = getBangladeshDate();
   const todayApps = allAppointments.filter(a => a.date === today);
-  
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weeklyApps = allAppointments.filter(a => new Date(a.date) >= weekAgo);
-  
-  const monthAgo = new Date();
-  monthAgo.setMonth(monthAgo.getMonth() - 1);
-  const monthlyApps = allAppointments.filter(a => new Date(a.date) >= monthAgo);
-  
-  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
   const completedApps = allAppointments.filter(a => a.status === 'Completed');
   const pendingApps = allAppointments.filter(a => a.status === 'Confirmed' || a.status === 'In Progress');
+  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
   
-  document.getElementById('totalToday').innerText = todayApps.length;
-  document.getElementById('totalWeekly').innerText = weeklyApps.length;
-  document.getElementById('totalMonthly').innerText = monthlyApps.length;
-  document.getElementById('totalPets').innerText = uniquePets.length;
-  document.getElementById('totalCompleted').innerText = completedApps.length;
-  document.getElementById('totalPending').innerText = pendingApps.length;
+  const todayStats = getElement('todayStatsCount');
+  const todayBadge = getElement('todayBadge');
+  const completedCount = getElement('completedCount');
+  const pendingCount = getElement('pendingCount');
+  const totalPets = getElement('totalPetsCount');
+  
+  if (todayStats) todayStats.innerText = todayApps.length;
+  if (todayBadge) todayBadge.innerText = todayApps.length;
+  if (completedCount) completedCount.innerText = completedApps.length;
+  if (pendingCount) pendingCount.innerText = pendingApps.length;
+  if (totalPets) totalPets.innerText = uniquePets.length;
 }
 
-function updateQuickStats() {
-  // Calculate total revenue (assuming each appointment = 500 BDT average)
-  const totalRevenue = allAppointments.length * 500;
-  const revenueElem = document.getElementById('totalRevenue');
-  if (revenueElem) revenueElem.innerText = totalRevenue.toLocaleString();
+// ============================================
+// SECTION 12: TODAY'S APPOINTMENTS
+// ============================================
+
+/**
+ * Load and display today's appointments
+ */
+async function loadTodayAppointments() {
+  const container = getElement('todayAppointments');
+  if (!container) return;
   
-  // Completion rate
-  const completed = allAppointments.filter(a => a.status === 'Completed').length;
-  const completionRate = allAppointments.length > 0 ? Math.round((completed / allAppointments.length) * 100) : 0;
-  const rateElem = document.getElementById('completionRate');
-  if (rateElem) rateElem.innerText = completionRate;
+  const selectedDate = getElement('todayDatePicker')?.value || getBangladeshDate();
+  container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
   
-  // Active doctors count
-  const doctorsElem = document.getElementById('activeDoctors');
-  if (doctorsElem) doctorsElem.innerText = doctors.length || 1;
+  const filteredApps = allAppointments.filter(a => a.date === selectedDate);
+  
+  if (filteredApps.length === 0) {
+    container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-day"></i> No appointments for ${selectedDate}</div>`;
+    return;
+  }
+  
+  filteredApps.sort((a, b) => a.time.localeCompare(b.time));
+  container.innerHTML = filteredApps.map(app => createAppointmentCard(app)).join('');
 }
 
-function loadRecentAppointments() {
-  const container = document.getElementById('recentAppointments');
+/**
+ * Load today's appointment preview for dashboard
+ */
+function loadTodayPreview() {
+  const container = getElement('todayPreview');
+  if (!container) return;
+  
+  const today = getBangladeshDate();
+  const todayApps = allAppointments.filter(a => a.date === today).slice(0, 5);
+  
+  if (todayApps.length === 0) {
+    container.innerHTML = '<div class="empty-state">No appointments today</div>';
+    return;
+  }
+  
+  container.innerHTML = todayApps.map(app => `
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between;">
+        <strong>${escapeHtml(app.petName)}</strong>
+        <span class="token">${app.token}</span>
+      </div>
+      <div style="font-size: 0.85rem;">${app.time} | ${escapeHtml(app.ownerName)}</div>
+    </div>
+  `).join('');
+}
+
+/**
+ * Load recent activity for dashboard
+ */
+function loadRecentActivity() {
+  const container = getElement('recentActivity');
   if (!container) return;
   
   const recent = [...allAppointments]
@@ -282,43 +698,37 @@ function loadRecentAppointments() {
     .slice(0, 5);
   
   if (recent.length === 0) {
-    container.innerHTML = '<div class="empty-state">No appointments yet</div>';
+    container.innerHTML = '<div class="empty-state">No recent activity</div>';
     return;
   }
   
   container.innerHTML = recent.map(app => `
-    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong>🐾 ${escapeHtml(app.petName)}</strong>
-          <div style="font-size: 0.8rem; color: #64748b;">📅 ${app.date} | ⏰ ${app.time}</div>
-        </div>
-        <div>
-          <span class="token">${app.token}</span>
-          <span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span>
-        </div>
+    <div class="history-item" style="border-left-color: #22c55e;" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between;">
+        <strong>${escapeHtml(app.petName)}</strong>
+        <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span>
       </div>
-      <div style="margin-top: 8px;">
-        👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}
-      </div>
+      <div style="font-size: 0.85rem;">${escapeHtml(app.ownerName)} | ${app.time} | ${app.date}</div>
     </div>
   `).join('');
 }
 
 // ============================================
-// ALL APPOINTMENTS LIST (with Pagination & Filters)
+// SECTION 13: ALL APPOINTMENTS (PAGINATION & FILTERS)
 // ============================================
-function loadAllAppointmentsList() {
-  const container = document.getElementById('allAppointmentsList');
+
+/**
+ * Load all appointments with pagination and filters
+ */
+async function loadAllAppointments() {
+  const container = getElement('allAppointments');
   if (!container) return;
   
-  const filterText = document.getElementById('filterInput')?.value.toLowerCase() || '';
-  const statusFilter = document.getElementById('statusFilter')?.value || 'all';
-  const dateFilter = document.getElementById('dateFilter')?.value || 'all';
+  const filterText = getElement('allFilterInput')?.value.toLowerCase() || '';
+  const statusFilter = getElement('statusFilter')?.value || 'all';
   
   let filtered = [...allAppointments];
   
-  // Apply text filter
   if (filterText) {
     filtered = filtered.filter(a => 
       a.petName.toLowerCase().includes(filterText) ||
@@ -328,42 +738,12 @@ function loadAllAppointmentsList() {
     );
   }
   
-  // Apply status filter
   if (statusFilter !== 'all') {
     filtered = filtered.filter(a => a.status === statusFilter);
   }
   
-  // Apply date filter
-  const today = getBangladeshDate();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
-  
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  
-  const monthAgo = new Date();
-  monthAgo.setMonth(monthAgo.getMonth() - 1);
-  
-  switch(dateFilter) {
-    case 'today':
-      filtered = filtered.filter(a => a.date === today);
-      break;
-    case 'tomorrow':
-      filtered = filtered.filter(a => a.date === tomorrowStr);
-      break;
-    case 'week':
-      filtered = filtered.filter(a => new Date(a.date) >= weekAgo);
-      break;
-    case 'month':
-      filtered = filtered.filter(a => new Date(a.date) >= monthAgo);
-      break;
-  }
-  
-  // Sort by date (newest first)
   filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   
-  // Pagination
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const start = (currentPage - 1) * itemsPerPage;
   const paginated = filtered.slice(start, start + itemsPerPage);
@@ -371,35 +751,18 @@ function loadAllAppointmentsList() {
   if (paginated.length === 0) {
     container.innerHTML = '<div class="empty-state">No appointments found</div>';
   } else {
-    container.innerHTML = paginated.map(app => `
-      <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
-        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-          <div>
-            <strong>🐾 ${escapeHtml(app.petName)}</strong>
-            <div style="font-size: 0.8rem; color: #64748b;">📅 ${app.date} | ⏰ ${app.time}</div>
-          </div>
-          <div>
-            <span class="token">${app.token}</span>
-            <span class="status ${getStatusClass(app.status)}">${app.status || 'Confirmed'}</span>
-          </div>
-        </div>
-        <div style="margin: 8px 0;">
-          👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}
-        </div>
-        <div style="font-size: 0.85rem;">
-          📋 Symptoms: ${escapeHtml(app.symptoms || 'N/A')}
-          ${app.diagnosis ? `<br>🩺 Diagnosis: ${escapeHtml(app.diagnosis)}` : ''}
-        </div>
-      </div>
-    `).join('');
+    container.innerHTML = paginated.map(app => createHistoryItem(app)).join('');
   }
   
-  // Render pagination
   renderPagination(totalPages);
 }
 
+/**
+ * Render pagination buttons
+ * @param {number} totalPages - Total number of pages
+ */
 function renderPagination(totalPages) {
-  const container = document.getElementById('pagination');
+  const container = getElement('pagination');
   if (!container) return;
   
   if (totalPages <= 1) {
@@ -414,583 +777,196 @@ function renderPagination(totalPages) {
   container.innerHTML = html;
 }
 
+/**
+ * Go to specific page number
+ * @param {number} page - Page number to navigate to
+ */
 function goToPageNum(page) {
   currentPage = page;
-  loadAllAppointmentsList();
+  loadAllAppointments();
 }
 
-function filterAppointments() {
+/**
+ * Filter all appointments (reset to page 1)
+ */
+function filterAllAppointments() {
   currentPage = 1;
-  loadAllAppointmentsList();
-}
-
-function getStatusClass(status) {
-  if (status === 'Completed') return 'completed';
-  if (status === 'Cancelled') return 'cancelled';
-  if (status === 'In Progress') return 'progress';
-  return 'confirmed';
+  loadAllAppointments();
 }
 
 // ============================================
-// VIEW APPOINTMENT DETAILS
+// SECTION 14: SEARCH PATIENTS (FIXED VERSION)
 // ============================================
-function viewAppointment(bookingId) {
-  const appointment = allAppointments.find(a => a.bookingId === bookingId);
-  if (!appointment) return;
+
+/**
+ * Search patients by name, owner name, or phone number
+ * Fixed: Shows proper loading state and handles empty results
+ */
+async function searchPatients() {
+  const searchInput = getElement('searchInput');
+  const container = getElement('searchResults');
   
-  const modal = document.getElementById('viewAppointmentModal');
-  const detailsDiv = document.getElementById('appointmentDetails');
+  if (!searchInput || !container) return;
   
-  if (!modal || !detailsDiv) return;
+  const term = searchInput.value.trim();
   
-  detailsDiv.innerHTML = `
-    <div class="appointment-full-details">
-      <div class="detail-row"><strong>🆔 Token:</strong> ${appointment.token}</div>
-      <div class="detail-row"><strong>📅 Date:</strong> ${appointment.date}</div>
-      <div class="detail-row"><strong>⏰ Time:</strong> ${appointment.time}</div>
-      <div class="detail-row"><strong>🐾 Pet Name:</strong> ${escapeHtml(appointment.petName)}</div>
-      <div class="detail-row"><strong>🎂 Pet Age:</strong> ${appointment.petAge || 'N/A'}</div>
-      <div class="detail-row"><strong>⚖️ Weight:</strong> ${appointment.weight || 'N/A'} kg</div>
-      <div class="detail-row"><strong>👤 Owner Name:</strong> ${escapeHtml(appointment.ownerName)}</div>
-      <div class="detail-row"><strong>📞 Phone:</strong> ${appointment.ownerPhone}</div>
-      <div class="detail-row"><strong>📋 Symptoms:</strong> ${escapeHtml(appointment.symptoms || 'N/A')}</div>
-      <div class="detail-row"><strong>🩺 Diagnosis:</strong> ${escapeHtml(appointment.diagnosis || 'N/A')}</div>
-      <div class="detail-row"><strong>💊 Prescription:</strong><br>${escapeHtml(appointment.prescription || 'N/A')}</div>
-      <div class="detail-row"><strong>📝 Treatment Plan:</strong> ${escapeHtml(appointment.treatmentPlan || 'N/A')}</div>
-      <div class="detail-row"><strong>📅 Follow-up Date:</strong> ${appointment.followUpDate || 'N/A'}</div>
-      <div class="detail-row"><strong>✅ Status:</strong> <span class="status ${getStatusClass(appointment.status)}">${appointment.status || 'Confirmed'}</span></div>
-      <div class="detail-row"><strong>📆 Booked On:</strong> ${new Date(appointment.timestamp).toLocaleString()}</div>
+  // Clear previous results and show validation message
+  if (!term) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-search"></i>
+        <h4>Enter Search Term</h4>
+        <p>Please enter pet name, owner name or phone number to search</p>
+      </div>`;
+    return;
+  }
+  
+  // Show loading state with spinner
+  container.innerHTML = `
+    <div class="search-loading">
+      <div class="loading-spinner"></div>
+      <p><i class="fas fa-spinner fa-spin"></i> Searching for "${escapeHtml(term)}"...</p>
+    </div>`;
+  
+  // Small delay to ensure loading state shows (for better UX)
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Perform search on allAppointments data
+  const searchTermLower = term.toLowerCase();
+  const results = allAppointments.filter(app => 
+    app.petName?.toLowerCase().includes(searchTermLower) ||
+    app.ownerName?.toLowerCase().includes(searchTermLower) ||
+    app.ownerPhone?.includes(term) ||
+    app.token?.toLowerCase().includes(searchTermLower)
+  );
+  
+  // Handle no results
+  if (results.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-user-slash"></i>
+        <h4>No Patients Found</h4>
+        <p>No results found for "${escapeHtml(term)}"</p>
+        <small>Try searching with pet name, owner name, phone number or token</small>
+      </div>`;
+    return;
+  }
+  
+  // Display results
+  container.innerHTML = `
+    <div class="search-results-header">
+      <h4><i class="fas fa-list"></i> Search Results (${results.length})</h4>
+      <p>Found ${results.length} appointment(s) for "${escapeHtml(term)}"</p>
+    </div>
+    <div class="appointments-grid">
+      ${results.map(app => createAppointmentCard(app)).join('')}
     </div>
   `;
   
-  modal.classList.add('show');
-  modal.style.display = 'flex';
-  window.currentViewBookingId = bookingId;
-}
-
-function closeViewAppointmentModal() {
-  const modal = document.getElementById('viewAppointmentModal');
-  if (modal) {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-}
-
-function deleteAppointmentFromModal() {
-  if (confirm('Are you sure you want to delete this appointment? This action cannot be undone.')) {
-    allAppointments = allAppointments.filter(a => a.bookingId !== window.currentViewBookingId);
-    
-    // Update localStorage backup
-    const bookings = {};
-    allAppointments.forEach(a => {
-      if (!bookings[a.date]) bookings[a.date] = [];
-      bookings[a.date].push(a.timeSlot);
-    });
-    localStorage.setItem('vet_bookings', JSON.stringify(bookings));
-    
-    closeViewAppointmentModal();
-    refreshAllData();
-    showToast('Appointment deleted successfully', 'success');
-  }
+  // Show success toast
+  showToast(`✅ Found ${results.length} result(s) for "${escapeHtml(term)}"`, 'success');
 }
 
 // ============================================
-// DOCTOR MANAGEMENT (CRUD)
+// SECTION 15: PRESCRIPTIONS & MEDICAL RECORDS
 // ============================================
-function loadDoctors() {
-  const stored = localStorage.getItem('clinic_doctors');
-  if (stored) {
-    doctors = JSON.parse(stored);
-  } else {
-    doctors = [
-      { id: 1, name: 'Dr. Mitesh Tripura', email: 'doctor@vetforpet.com', specialization: 'Senior Veterinary Surgeon', phone: '01406779238', schedule: 'Sat-Wed 9AM-9PM' }
-    ];
-    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-  }
-  renderDoctors();
-}
 
-function renderDoctors() {
-  const container = document.getElementById('doctorsList');
+/**
+ * Load prescriptions list
+ */
+async function loadPrescriptions() {
+  const container = getElement('prescriptionsList');
   if (!container) return;
   
-  if (doctors.length === 0) {
-    container.innerHTML = '<div class="empty-state">No doctors added yet</div>';
+  const prescriptions = allAppointments.filter(a => a.prescription && a.prescription !== '');
+  
+  if (prescriptions.length === 0) {
+    container.innerHTML = '<div class="empty-state">No prescriptions yet</div>';
     return;
   }
   
-  container.innerHTML = doctors.map(doc => `
-    <div class="history-item">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
-        <div>
-          <strong><i class="fas fa-user-md"></i> ${escapeHtml(doc.name)}</strong>
-          <div style="font-size: 0.85rem; color: #64748b;">🔬 ${escapeHtml(doc.specialization)}</div>
-          <div style="font-size: 0.8rem;">📧 ${doc.email} | 📞 ${doc.phone || 'N/A'}</div>
-          <div style="font-size: 0.8rem;">⏰ ${doc.schedule || 'Flexible'}</div>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn-secondary" onclick="editDoctor(${doc.id})"><i class="fas fa-edit"></i> Edit</button>
-          <button class="btn-danger" onclick="deleteDoctor(${doc.id})"><i class="fas fa-trash"></i> Delete</button>
-        </div>
+  container.innerHTML = prescriptions.map(app => `
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between;">
+        <strong>${escapeHtml(app.petName)}</strong>
+        <span class="token">${app.token}</span>
       </div>
+      <div style="margin-top: 10px;">
+        <strong>Prescription:</strong><br>
+        <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; margin-top: 5px;">${escapeHtml(app.prescription)}</div>
+      </div>
+      ${app.diagnosis ? `<div style="margin-top: 8px;"><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis)}</div>` : ''}
     </div>
   `).join('');
 }
 
-function showAddDoctorModal() {
-  const modal = document.getElementById('addDoctorModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
-}
-
-function closeAddDoctorModal() {
-  const modal = document.getElementById('addDoctorModal');
-  if (modal) {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-  document.getElementById('newDoctorName').value = '';
-  document.getElementById('newDoctorEmail').value = '';
-  document.getElementById('newDoctorPassword').value = '';
-  document.getElementById('newDoctorSpecialization').value = '';
-  document.getElementById('newDoctorPhone').value = '';
-  document.getElementById('newDoctorSchedule').value = '';
-}
-
-function addDoctor() {
-  const newDoctor = {
-    id: Date.now(),
-    name: document.getElementById('newDoctorName').value,
-    email: document.getElementById('newDoctorEmail').value,
-    password: document.getElementById('newDoctorPassword').value,
-    specialization: document.getElementById('newDoctorSpecialization').value,
-    phone: document.getElementById('newDoctorPhone').value,
-    schedule: document.getElementById('newDoctorSchedule').value
-  };
-  
-  if (!newDoctor.name || !newDoctor.email) {
-    showToast('Please fill required fields', 'error');
-    return;
-  }
-  
-  doctors.push(newDoctor);
-  localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-  renderDoctors();
-  closeAddDoctorModal();
-  showToast('Doctor added successfully', 'success');
-}
-
-function editDoctor(id) {
-  const doctor = doctors.find(d => d.id === id);
-  if (!doctor) return;
-  
-  document.getElementById('editDoctorId').value = doctor.id;
-  document.getElementById('editDoctorName').value = doctor.name;
-  document.getElementById('editDoctorEmail').value = doctor.email;
-  document.getElementById('editDoctorSpecialization').value = doctor.specialization || '';
-  document.getElementById('editDoctorPhone').value = doctor.phone || '';
-  document.getElementById('editDoctorSchedule').value = doctor.schedule || '';
-  
-  const modal = document.getElementById('editDoctorModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
-}
-
-function closeEditDoctorModal() {
-  const modal = document.getElementById('editDoctorModal');
-  if (modal) {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-}
-
-function updateDoctor() {
-  const id = parseInt(document.getElementById('editDoctorId').value);
-  const index = doctors.findIndex(d => d.id === id);
-  
-  if (index !== -1) {
-    doctors[index] = {
-      ...doctors[index],
-      name: document.getElementById('editDoctorName').value,
-      email: document.getElementById('editDoctorEmail').value,
-      specialization: document.getElementById('editDoctorSpecialization').value,
-      phone: document.getElementById('editDoctorPhone').value,
-      schedule: document.getElementById('editDoctorSchedule').value
-    };
-    
-    const newPassword = document.getElementById('editDoctorPassword').value;
-    if (newPassword) doctors[index].password = newPassword;
-    
-    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-    renderDoctors();
-    closeEditDoctorModal();
-    showToast('Doctor updated successfully', 'success');
-  }
-}
-
-function deleteDoctor(id) {
-  if (confirm('Are you sure you want to delete this doctor?')) {
-    doctors = doctors.filter(d => d.id !== id);
-    localStorage.setItem('clinic_doctors', JSON.stringify(doctors));
-    renderDoctors();
-    showToast('Doctor deleted successfully', 'success');
-  }
-}
-
-// ============================================
-// SERVICES MANAGEMENT (CRUD)
-// ============================================
-function loadServices() {
-  const stored = localStorage.getItem('clinic_services');
-  if (stored) {
-    services = JSON.parse(stored);
-  } else {
-    services = [
-      { id: 1, name: 'General Checkup', icon: 'fa-stethoscope', desc: 'Complete physical exam & health screening', price: 500, duration: 30 },
-      { id: 2, name: 'Vaccination', icon: 'fa-syringe', desc: 'Core & lifestyle vaccines', price: 800, duration: 20 },
-      { id: 3, name: 'Dental Care', icon: 'fa-tooth', desc: 'Scaling & oral hygiene', price: 1000, duration: 45 }
-    ];
-    localStorage.setItem('clinic_services', JSON.stringify(services));
-  }
-  renderServices();
-}
-
-function renderServices() {
-  const container = document.getElementById('servicesList');
+/**
+ * Load medical records list
+ */
+async function loadMedicalRecords() {
+  const container = getElement('medicalRecordsList');
   if (!container) return;
   
-  if (services.length === 0) {
-    container.innerHTML = '<div class="empty-state">No services added yet</div>';
+  const records = allAppointments.filter(a => a.diagnosis || a.prescription);
+  
+  if (records.length === 0) {
+    container.innerHTML = '<div class="empty-state">No medical records yet</div>';
     return;
   }
   
-  container.innerHTML = services.map(service => `
-    <div class="history-item">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
-        <div>
-          <strong><i class="fas ${service.icon}"></i> ${escapeHtml(service.name)}</strong>
-          <div style="font-size: 0.85rem;">${escapeHtml(service.desc)}</div>
-          <div style="font-size: 0.8rem; color: #64748b;">💰 ৳${service.price} | ⏱️ ${service.duration} min</div>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn-secondary" onclick="editService(${service.id})"><i class="fas fa-edit"></i> Edit</button>
-          <button class="btn-danger" onclick="deleteService(${service.id})"><i class="fas fa-trash"></i> Delete</button>
-        </div>
+  container.innerHTML = records.map(app => `
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between;">
+        <strong>${escapeHtml(app.petName)}</strong>
+        <span class="token">${app.token}</span>
       </div>
+      <div><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis || 'N/A')}</div>
+      <div><strong>Prescription:</strong> ${escapeHtml((app.prescription || '').substring(0, 100))}${(app.prescription || '').length > 100 ? '...' : ''}</div>
     </div>
   `).join('');
 }
 
-function showAddServiceModal() {
-  const modal = document.getElementById('addServiceModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
-}
-
-function closeAddServiceModal() {
-  const modal = document.getElementById('addServiceModal');
-  if (modal) {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-}
-
-function addService() {
-  const newService = {
-    id: Date.now(),
-    name: document.getElementById('newServiceName').value,
-    icon: document.getElementById('newServiceIcon').value || 'fa-stethoscope',
-    desc: document.getElementById('newServiceDesc').value,
-    price: parseInt(document.getElementById('newServicePrice').value) || 0,
-    duration: parseInt(document.getElementById('newServiceDuration').value) || 30
-  };
-  
-  if (!newService.name) {
-    showToast('Please enter service name', 'error');
-    return;
-  }
-  
-  services.push(newService);
-  localStorage.setItem('clinic_services', JSON.stringify(services));
-  renderServices();
-  closeAddServiceModal();
-  showToast('Service added successfully', 'success');
-}
-
-function editService(id) {
-  const service = services.find(s => s.id === id);
-  if (!service) return;
-  
-  document.getElementById('editServiceId').value = service.id;
-  document.getElementById('editServiceName').value = service.name;
-  document.getElementById('editServiceIcon').value = service.icon;
-  document.getElementById('editServiceDesc').value = service.desc;
-  document.getElementById('editServicePrice').value = service.price;
-  document.getElementById('editServiceDuration').value = service.duration;
-  
-  const modal = document.getElementById('editServiceModal');
-  if (modal) {
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-  }
-}
-
-function closeEditServiceModal() {
-  const modal = document.getElementById('editServiceModal');
-  if (modal) {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-}
-
-function updateService() {
-  const id = parseInt(document.getElementById('editServiceId').value);
-  const index = services.findIndex(s => s.id === id);
-  
-  if (index !== -1) {
-    services[index] = {
-      ...services[index],
-      name: document.getElementById('editServiceName').value,
-      icon: document.getElementById('editServiceIcon').value,
-      desc: document.getElementById('editServiceDesc').value,
-      price: parseInt(document.getElementById('editServicePrice').value) || 0,
-      duration: parseInt(document.getElementById('editServiceDuration').value) || 30
-    };
-    
-    localStorage.setItem('clinic_services', JSON.stringify(services));
-    renderServices();
-    closeEditServiceModal();
-    showToast('Service updated successfully', 'success');
-  }
-}
-
-function deleteService(id) {
-  if (confirm('Are you sure you want to delete this service?')) {
-    services = services.filter(s => s.id !== id);
-    localStorage.setItem('clinic_services', JSON.stringify(services));
-    renderServices();
-    showToast('Service deleted successfully', 'success');
-  }
-}
-
 // ============================================
-// SETTINGS & CONFIGURATION
+// SECTION 16: DOCTOR REPORT & CHART
 // ============================================
-function loadSettings() {
-  const settings = JSON.parse(localStorage.getItem('clinic_settings') || '{}');
-  document.getElementById('clinicName').value = settings.clinicName || 'VET FOR PET CLINIC';
-  document.getElementById('clinicAddress').value = settings.clinicAddress || 'Dhaka, Bangladesh';
-  document.getElementById('clinicPhone').value = settings.clinicPhone || '01406-779238';
-  document.getElementById('clinicEmergency').value = settings.clinicEmergency || '01609-420061';
-  document.getElementById('clinicEmail').value = settings.clinicEmail || 'info@vetforpet.com';
-}
 
-function saveSettings() {
-  const settings = {
-    clinicName: document.getElementById('clinicName').value,
-    clinicAddress: document.getElementById('clinicAddress').value,
-    clinicPhone: document.getElementById('clinicPhone').value,
-    clinicEmergency: document.getElementById('clinicEmergency').value,
-    clinicEmail: document.getElementById('clinicEmail').value
-  };
-  localStorage.setItem('clinic_settings', JSON.stringify(settings));
-  showToast('Settings saved successfully', 'success');
-}
-
-function loadSlotConfig() {
-  const defaultConfig = {
-    "Saturday": { start: 9, end: 21 },
-    "Sunday": { start: 9, end: 15 },
-    "Monday": { start: 9, end: 15 },
-    "Tuesday": { start: 9, end: 21 },
-    "Wednesday": { start: 9, end: 15 },
-    "Thursday": { start: 9, end: 15 },
-    "Friday": { start: 9, end: 15 }
-  };
+/**
+ * Load doctor performance report based on selected period
+ */
+async function loadDoctorReport() {
+  const period = getElement('reportPeriod')?.value || 'weekly';
+  let filtered = [...allAppointments];
   
-  const config = JSON.parse(localStorage.getItem('slot_config') || JSON.stringify(defaultConfig));
-  const container = document.getElementById('slotConfig');
-  if (!container) return;
-  
-  container.innerHTML = Object.entries(config).map(([day, cfg]) => `
-    <div class="slot-item">
-      <label>${day}</label>
-      <input type="number" id="${day}_start" value="${cfg.start}" placeholder="Start" min="0" max="23"> -
-      <input type="number" id="${day}_end" value="${cfg.end}" placeholder="End" min="0" max="23">
-    </div>
-  `).join('');
-}
-
-function saveSlotConfig() {
-  const newConfig = {};
-  const days = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  
-  days.forEach(day => {
-    newConfig[day] = {
-      start: parseInt(document.getElementById(`${day}_start`).value) || 9,
-      end: parseInt(document.getElementById(`${day}_end`).value) || 17
-    };
-  });
-  
-  localStorage.setItem('slot_config', JSON.stringify(newConfig));
-  showToast('Slot configuration saved successfully', 'success');
-}
-
-function loadPricing() {
-  const pricing = JSON.parse(localStorage.getItem('service_pricing') || '{}');
-  const container = document.getElementById('pricingConfig');
-  if (!container) return;
-  
-  if (services.length > 0) {
-    container.innerHTML = services.map(service => `
-      <div class="slot-item">
-        <label>${escapeHtml(service.name)}</label>
-        <input type="number" id="price_${service.id}" value="${pricing[service.id] || service.price || 500}" placeholder="Price (BDT)">
-      </div>
-    `).join('');
+  if (period === 'weekly') {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    filtered = filtered.filter(a => new Date(a.date) >= weekAgo);
+  } else if (period === 'monthly') {
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    filtered = filtered.filter(a => new Date(a.date) >= monthAgo);
   } else {
-    container.innerHTML = '<p>Add services first to set pricing</p>';
-  }
-}
-
-function savePricing() {
-  const pricing = {};
-  services.forEach(service => {
-    const priceInput = document.getElementById(`price_${service.id}`);
-    if (priceInput) {
-      pricing[service.id] = parseInt(priceInput.value) || 0;
-    }
-  });
-  localStorage.setItem('service_pricing', JSON.stringify(pricing));
-  showToast('Pricing saved successfully', 'success');
-}
-
-// ============================================
-// BACKUP & EXPORT
-// ============================================
-function exportToCSV() {
-  if (allAppointments.length === 0) {
-    showToast('No data to export', 'error');
-    return;
+    const yearAgo = new Date();
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+    filtered = filtered.filter(a => new Date(a.date) >= yearAgo);
   }
   
-  let csv = "Date,Time,Token,Pet Name,Pet Age,Weight,Owner Name,Phone,Symptoms,Diagnosis,Prescription,Status\n";
-  allAppointments.forEach(a => {
-    csv += `"${a.date}","${a.time}","${a.token}","${escapeCsv(a.petName)}","${escapeCsv(a.petAge || '')}","${escapeCsv(a.weight || '')}","${escapeCsv(a.ownerName)}","${a.ownerPhone}","${escapeCsv(a.symptoms || '')}","${escapeCsv(a.diagnosis || '')}","${escapeCsv(a.prescription || '')}","${a.status || 'Confirmed'}"\n`;
-  });
+  const totalElem = getElement('reportTotal');
+  const completedElem = getElement('reportCompleted');
+  const cancelledElem = getElement('reportCancelled');
   
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `appointments_${getBangladeshDate()}.csv`;
-  link.click();
-  showToast('CSV exported successfully', 'success');
+  if (totalElem) totalElem.innerText = filtered.length;
+  if (completedElem) completedElem.innerText = filtered.filter(a => a.status === 'Completed').length;
+  if (cancelledElem) cancelledElem.innerText = filtered.filter(a => a.status === 'Cancelled').length;
+  
+  updateDoctorChart(filtered);
 }
 
-function escapeCsv(str) {
-  if (!str) return '';
-  return str.replace(/"/g, '""');
-}
-
-function backupData() {
-  const backup = {
-    appointments: allAppointments,
-    doctors: doctors,
-    services: services,
-    settings: localStorage.getItem('clinic_settings'),
-    slotConfig: localStorage.getItem('slot_config'),
-    pricing: localStorage.getItem('service_pricing'),
-    date: new Date().toISOString()
-  };
-  
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `vet_clinic_backup_${getBangladeshDate()}.json`;
-  link.click();
-  
-  localStorage.setItem('lastBackup', new Date().toLocaleString());
-  const lastBackupSpan = document.getElementById('lastBackup');
-  if (lastBackupSpan) lastBackupSpan.innerText = new Date().toLocaleString();
-  showToast('Backup downloaded successfully', 'success');
-}
-
-function triggerRestore() {
-  document.getElementById('restoreFile').click();
-}
-
-document.getElementById('restoreFile')?.addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const data = JSON.parse(ev.target.result);
-      
-      if (data.appointments) {
-        const bookings = {};
-        data.appointments.forEach(a => {
-          if (!bookings[a.date]) bookings[a.date] = [];
-          bookings[a.date].push(a.timeSlot);
-        });
-        localStorage.setItem('vet_bookings', JSON.stringify(bookings));
-        allAppointments = data.appointments;
-        refreshAllData();
-      }
-      if (data.doctors) {
-        localStorage.setItem('clinic_doctors', JSON.stringify(data.doctors));
-        doctors = data.doctors;
-        renderDoctors();
-      }
-      if (data.services) {
-        localStorage.setItem('clinic_services', JSON.stringify(data.services));
-        services = data.services;
-        renderServices();
-      }
-      if (data.settings) localStorage.setItem('clinic_settings', data.settings);
-      if (data.slotConfig) localStorage.setItem('slot_config', data.slotConfig);
-      if (data.pricing) localStorage.setItem('service_pricing', data.pricing);
-      
-      showToast('Restore successful! Refreshing...', 'success');
-      setTimeout(() => location.reload(), 1500);
-    } catch(err) {
-      showToast('Invalid backup file', 'error');
-    }
-  };
-  reader.readAsText(file);
-});
-
-// ============================================
-// REPORTS & CHARTS
-// ============================================
-function updateReportStats() {
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const weeklyApps = allAppointments.filter(a => new Date(a.date) >= oneWeekAgo);
-  document.getElementById('weeklyCount').innerText = weeklyApps.length;
-  
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-  const monthlyApps = allAppointments.filter(a => new Date(a.date) >= oneMonthAgo);
-  document.getElementById('monthlyCount').innerText = monthlyApps.length;
-  
-  const completedApps = allAppointments.filter(a => a.status === 'Completed');
-  document.getElementById('completedReportCount').innerText = completedApps.length;
-  
-  const uniquePets = [...new Set(allAppointments.map(a => a.petName))];
-  document.getElementById('totalPetsReportCount').innerText = uniquePets.length;
-  
-  createWeeklyChart();
-}
-
-function createWeeklyChart() {
+/**
+ * Update doctor performance chart
+ * @param {Array} appointments - Appointments data for chart
+ */
+function updateDoctorChart(appointments) {
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
@@ -998,17 +974,17 @@ function createWeeklyChart() {
     last7Days.push(date.toISOString().split('T')[0]);
   }
   
-  const dailyCounts = last7Days.map(date => allAppointments.filter(a => a.date === date).length);
+  const dailyCounts = last7Days.map(date => appointments.filter(a => a.date === date).length);
   
-  const ctx = document.getElementById('weeklyChart')?.getContext('2d');
+  const ctx = getElement('doctorChart')?.getContext('2d');
   if (!ctx) return;
   
-  if (adminChart) adminChart.destroy();
+  if (doctorChart) doctorChart.destroy();
   
-  adminChart = new Chart(ctx, {
+  doctorChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })),
+      labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', { weekday: 'short' })),
       datasets: [{
         label: 'Appointments',
         data: dailyCounts,
@@ -1016,18 +992,639 @@ function createWeeklyChart() {
         borderRadius: 8
       }]
     },
-    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } }
+    }
   });
 }
 
 // ============================================
-// UTILITIES
+// SECTION 17: VIEW APPOINTMENT
 // ============================================
-function showLoading(message) {
-  // Optional loading indicator
-  console.log(message);
+
+/**
+ * View appointment details
+ * @param {string} bookingId - Booking ID to view
+ */
+function viewAppointment(bookingId) {
+  const app = allAppointments.find(a => a.bookingId === bookingId);
+  if (!app) return;
+  
+  currentViewBookingId = bookingId;
+  const detailsDiv = getElement('viewAppointmentDetails');
+  
+  if (!detailsDiv) return;
+  
+  detailsDiv.innerHTML = `
+    <div style="margin-bottom: 8px;"><strong>Token:</strong> ${app.token}</div>
+    <div style="margin-bottom: 8px;"><strong>Date:</strong> ${app.date} | <strong>Time:</strong> ${app.time}</div>
+    <div style="margin-bottom: 8px;"><strong>Pet:</strong> ${escapeHtml(app.petName)} (${app.petAge || 'N/A'})</div>
+    <div style="margin-bottom: 8px;"><strong>Owner:</strong> ${escapeHtml(app.ownerName)} | <strong>Phone:</strong> ${app.ownerPhone}</div>
+    <div style="margin-bottom: 8px;"><strong>Symptoms:</strong> ${escapeHtml(app.symptoms || 'N/A')}</div>
+    <div style="margin-bottom: 8px;"><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis || 'N/A')}</div>
+    <div style="margin-bottom: 8px;"><strong>Prescription:</strong><br>${escapeHtml(app.prescription || 'N/A')}</div>
+    <div style="margin-bottom: 8px;"><strong>Status:</strong> <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
+  `;
+  
+  const modal = getElement('viewAppointmentModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
 }
 
+/**
+ * Close view appointment modal
+ */
+function closeViewModal() {
+  const modal = getElement('viewAppointmentModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+/**
+ * Open medical info modal from view modal
+ */
+function openMedicalFromView() {
+  closeViewModal();
+  openMedicalModal(currentViewBookingId);
+}
+
+/**
+ * Print appointment from view modal
+ */
+function printAppointmentFromView() {
+  const app = allAppointments.find(a => a.bookingId === currentViewBookingId);
+  if (!app) return;
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Appointment - ${app.token}</title>
+    <style>body{font-family:Arial;padding:20px}.header{text-align:center;margin-bottom:20px}</style>
+    </head>
+    <body>
+      <div class="header"><h2>VET FOR PET CLINIC</h2><p>Dhaka, Bangladesh | 01609-420061</p></div>
+      <h3>Appointment Details</h3>
+      <p><strong>Token:</strong> ${app.token}<br><strong>Date:</strong> ${app.date}<br><strong>Pet:</strong> ${app.petName}<br><strong>Owner:</strong> ${app.ownerName}<br><strong>Phone:</strong> ${app.ownerPhone}<br><strong>Symptoms:</strong> ${app.symptoms||'N/A'}<br><strong>Diagnosis:</strong> ${app.diagnosis||'N/A'}<br><strong>Prescription:</strong><br>${app.prescription||'N/A'}</p>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+// ============================================
+// SECTION 18: MEDICAL MODAL - COMPLETE
+// ============================================
+
+/**
+ * Open medical info modal for a booking
+ * @param {string} bookingId - Booking ID to edit medical info
+ */
+function openMedicalModal(bookingId) {
+  const app = allAppointments.find(a => a.bookingId === bookingId);
+  if (!app) return;
+  
+  currentModalBookingId = bookingId;
+  
+  const summaryPetName = getElement('summaryPetName');
+  const summaryDate = getElement('summaryDate');
+  const summaryTime = getElement('summaryTime');
+  const summaryToken = getElement('summaryToken');
+  const summaryOwner = getElement('summaryOwner');
+  const summaryPhone = getElement('summaryPhone');
+  const modalSymptoms = getElement('modalSymptoms');
+  const modalTemperature = getElement('modalTemperature');
+  const modalHeartRate = getElement('modalHeartRate');
+  const modalRespiratory = getElement('modalRespiratory');
+  const modalDiagnosis = getElement('modalDiagnosis');
+  const modalClinicalFindings = getElement('modalClinicalFindings');
+  const modalTreatmentPlan = getElement('modalTreatmentPlan');
+  const modalFollowup = getElement('modalFollowup');
+  const modalNotes = getElement('modalNotes');
+  const modalStatus = getElement('modalStatus');
+  const modalOwnerEmail = getElement('modalOwnerEmail');
+  const modalEmailReminder = getElement('modalEmailReminder');
+  
+  if (summaryPetName) summaryPetName.innerHTML = app.petName;
+  if (summaryDate) summaryDate.innerText = app.date;
+  if (summaryTime) summaryTime.innerText = app.time;
+  if (summaryToken) summaryToken.innerHTML = app.token;
+  if (summaryOwner) summaryOwner.innerHTML = app.ownerName;
+  if (summaryPhone) summaryPhone.innerHTML = app.ownerPhone;
+  if (modalSymptoms) modalSymptoms.innerHTML = app.symptoms || 'No symptoms recorded';
+  if (modalTemperature) modalTemperature.value = app.temperature || '';
+  if (modalHeartRate) modalHeartRate.value = app.heartRate || '';
+  if (modalRespiratory) modalRespiratory.value = app.respiratoryRate || '';
+  if (modalDiagnosis) modalDiagnosis.value = app.diagnosis || '';
+  if (modalClinicalFindings) modalClinicalFindings.value = app.clinicalFindings || '';
+  if (modalTreatmentPlan) modalTreatmentPlan.value = app.treatmentPlan || '';
+  if (modalFollowup) modalFollowup.value = app.followUpDate || '';
+  if (modalNotes) modalNotes.value = app.notes || '';
+  if (modalStatus) modalStatus.value = app.status || 'Confirmed';
+  if (modalOwnerEmail) modalOwnerEmail.value = app.ownerEmail || '';
+  if (modalEmailReminder) modalEmailReminder.checked = app.emailReminder === 'true';
+  
+  loadPrescriptionList(app.prescription || '');
+  
+  const modal = getElement('medicalModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+  }
+}
+
+/**
+ * Close medical modal
+ */
+function closeMedicalModal() {
+  const modal = getElement('medicalModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+  }
+}
+
+/**
+ * Alias for closeMedicalModal
+ */
+function closeModal() {
+  closeMedicalModal();
+}
+
+/**
+ * Save medical information from modal
+ */
+async function saveModalMedicalInfo() {
+  const prescriptionText = getPrescriptionText();
+  const ownerEmail = getElement('modalOwnerEmail')?.value || '';
+  const emailReminder = getElement('modalEmailReminder')?.checked || false;
+  
+  const medicalData = {
+    temperature: getElement('modalTemperature')?.value || '',
+    heartRate: getElement('modalHeartRate')?.value || '',
+    respiratoryRate: getElement('modalRespiratory')?.value || '',
+    diagnosis: getElement('modalDiagnosis')?.value || '',
+    clinicalFindings: getElement('modalClinicalFindings')?.value || '',
+    prescription: prescriptionText,
+    treatmentPlan: getElement('modalTreatmentPlan')?.value || '',
+    followUpDate: getElement('modalFollowup')?.value || '',
+    notes: getElement('modalNotes')?.value || '',
+    status: getElement('modalStatus')?.value || 'Confirmed',
+    ownerEmail: ownerEmail,
+    emailReminder: emailReminder
+  };
+  
+  const saveBtn = document.querySelector('#medicalModal .btn-primary-custom');
+  if (!saveBtn) return;
+  
+  const originalText = saveBtn.innerHTML;
+  saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  saveBtn.disabled = true;
+  
+  const success = await saveMedicalInfo(currentModalBookingId, medicalData);
+  
+  if (success) {
+    saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+    setTimeout(() => {
+      saveBtn.innerHTML = originalText;
+      saveBtn.disabled = false;
+    }, 1500);
+    closeMedicalModal();
+    await loadAllData();
+    showToast('Medical information saved successfully!', 'success');
+    
+    if (emailReminder && ownerEmail) {
+      sendPrescriptionEmailManual(ownerEmail, medicalData.diagnosis, prescriptionText);
+    }
+  } else {
+    saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error!';
+    setTimeout(() => {
+      saveBtn.innerHTML = originalText;
+      saveBtn.disabled = false;
+    }, 2000);
+    showToast('Error saving medical information', 'error');
+  }
+}
+
+/**
+ * Send prescription email from modal
+ */
+function sendPrescriptionEmail() {
+  const email = getElement('modalOwnerEmail')?.value;
+  const diagnosis = getElement('modalDiagnosis')?.value;
+  const prescription = getPrescriptionText();
+  
+  if (!email) {
+    showToast('Please enter patient email address', 'error');
+    return;
+  }
+  
+  sendPrescriptionEmailManual(email, diagnosis, prescription);
+}
+
+/**
+ * Send prescription email manually
+ * @param {string} email - Recipient email address
+ * @param {string} diagnosis - Diagnosis text
+ * @param {string} prescription - Prescription text
+ */
+function sendPrescriptionEmailManual(email, diagnosis, prescription) {
+  const doctor = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh Tripura';
+  const clinicName = "VET FOR PET CLINIC";
+  const clinicAddress = "PCXR+55F, Titash Road, Dhaka, Bangladesh";
+  const clinicPhone = "01406-779238";
+  const clinicEmergency = "01609-420061";
+  const clinicEmail = "info@vetforpet.com";
+  
+  const subject = `Prescription from ${clinicName}`;
+  const body = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    ${clinicName}
+            Advanced Veterinary Care | Compassion at Heart
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 Address: ${clinicAddress}
+📞 Phone: ${clinicPhone} | 🚨 Emergency: ${clinicEmergency}
+✉️ Email: ${clinicEmail}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    📋 PRESCRIPTION
+
+👨‍⚕️ Doctor: ${doctor}
+📅 Date: ${getBangladeshDate()}
+
+🔬 DIAGNOSIS:
+${diagnosis || 'As per consultation'}
+
+💊 PRESCRIPTION / MEDICINES:
+${prescription || 'No medicines prescribed'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Important Notes:
+• Please follow the prescription as advised
+• Complete the full course of medication
+• Contact us for any side effects or concerns
+• Keep follow-up appointment if scheduled
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thank you for choosing ${clinicName}
+We wish your pet a speedy recovery! 🐾
+
+© ${new Date().getFullYear()} ${clinicName} | All Rights Reserved
+  `;
+  
+  window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  showToast('Email client opened with company details!', 'success');
+}
+
+/**
+ * Print medical info
+ */
+function printMedicalInfo() {
+  const pet = getElement('summaryPetName')?.innerHTML || 'N/A';
+  const diagnosis = getElement('modalDiagnosis')?.value || 'N/A';
+  const prescription = getPrescriptionText() || 'No medicines prescribed';
+  const temp = getElement('modalTemperature')?.value || '--';
+  const hr = getElement('modalHeartRate')?.value || '--';
+  const doctor = sessionStorage.getItem('doctor_name') || 'Dr. Mitesh Tripura';
+  const owner = getElement('summaryOwner')?.innerHTML || 'N/A';
+  const token = getElement('summaryToken')?.innerHTML || 'N/A';
+  const symptoms = getElement('modalSymptoms')?.innerHTML || 'No symptoms recorded';
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Medical Record - VET FOR PET CLINIC</title>
+    <style>body{font-family:Arial;padding:20px}.header{text-align:center;margin-bottom:20px}</style>
+    </head>
+    <body>
+      <div class="header"><h2>VET FOR PET CLINIC</h2><p>Dhaka, Bangladesh | 01609-420061</p><hr></div>
+      <h3>Medical Record</h3>
+      <p><strong>Pet:</strong> ${pet}<br><strong>Owner:</strong> ${owner}<br><strong>Token:</strong> ${token}<br><strong>Symptoms:</strong> ${symptoms}<br><strong>Temperature:</strong> ${temp}°C | <strong>Heart Rate:</strong> ${hr} bpm<br><strong>Diagnosis:</strong> ${diagnosis}<br><strong>Prescription:</strong><br>${prescription}<br><strong>Doctor:</strong> ${doctor}<br><strong>Date:</strong> ${getBangladeshDate()}</p>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+// ============================================
+// SECTION 19: PRESCRIPTION FUNCTIONS
+// ============================================
+
+/**
+ * Load prescription list into modal
+ * @param {string} savedPrescription - Saved prescription text
+ */
+function loadPrescriptionList(savedPrescription) {
+  const container = getElement('prescriptionList');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  if (savedPrescription && savedPrescription.trim()) {
+    const lines = savedPrescription.split('\n');
+    lines.forEach(line => {
+      const cleanLine = line.replace(/^•\s*/, '').trim();
+      if (cleanLine) addPrescriptionField(cleanLine, '', '');
+    });
+  }
+  
+  if (container.children.length === 0) {
+    addPrescriptionField('', '', '');
+  }
+}
+
+/**
+ * Add a prescription field to the list
+ * @param {string} medName - Medicine name
+ * @param {string} dosage - Dosage information
+ * @param {string} duration - Duration information
+ */
+function addPrescriptionField(medName = '', dosage = '', duration = '') {
+  const container = getElement('prescriptionList');
+  if (!container) return;
+  
+  const div = document.createElement('div');
+  div.className = 'prescription-item';
+  div.innerHTML = `
+    <input type="text" class="clean-input med-name" placeholder="Medicine name" value="${escapeHtml(medName)}">
+    <input type="text" class="clean-input med-dosage" placeholder="Dosage" value="${escapeHtml(dosage)}">
+    <input type="text" class="clean-input med-duration" placeholder="Duration" value="${escapeHtml(duration)}">
+    <button type="button" class="remove-prescription" onclick="removePrescription(this)"><i class="fas fa-trash-alt"></i></button>
+  `;
+  container.appendChild(div);
+}
+
+/**
+ * Remove a prescription field
+ * @param {HTMLElement} btn - The remove button element
+ */
+function removePrescription(btn) {
+  const container = getElement('prescriptionList');
+  if (!container) return;
+  
+  if (container.children.length > 1) {
+    btn.closest('.prescription-item').remove();
+  } else {
+    const item = btn.closest('.prescription-item');
+    if (item) {
+      item.querySelector('.med-name').value = '';
+      item.querySelector('.med-dosage').value = '';
+      item.querySelector('.med-duration').value = '';
+    }
+  }
+}
+
+/**
+ * Get prescription text from fields
+ * @returns {string} Formatted prescription text
+ */
+function getPrescriptionText() {
+  const items = document.querySelectorAll('#prescriptionList .prescription-item');
+  const lines = [];
+  
+  items.forEach(item => {
+    const name = item.querySelector('.med-name')?.value.trim();
+    if (name) {
+      let line = `• ${name}`;
+      const dosage = item.querySelector('.med-dosage')?.value.trim();
+      const duration = item.querySelector('.med-duration')?.value.trim();
+      if (dosage) line += `: ${dosage}`;
+      if (duration) line += ` (${duration})`;
+      lines.push(line);
+    }
+  });
+  
+  return lines.join('\n');
+}
+
+// ============================================
+// SECTION 20: PRINT FUNCTIONS
+// ============================================
+
+/**
+ * Print today's appointments
+ */
+function printTodayAppointments() {
+  const date = getElement('todayDatePicker')?.value || getBangladeshDate();
+  const apps = allAppointments.filter(a => a.date === date);
+  
+  if (apps.length === 0) {
+    showToast('No appointments for this date', 'error');
+    return;
+  }
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Today's Appointments</title>
+    <style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f97316;color:white}</style>
+    </head>
+    <body>
+      <h2>VET FOR PET CLINIC - Appointments for ${date}</h2>
+      <table><thead><tr><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead>
+      <tbody>${apps.map(a => `<tr><td>${a.time} side-by-side: ${escapeHtml(a.petName)} side-by-side: ${escapeHtml(a.ownerName)} side-by-side: ${a.token} side-by-side: ${a.status || 'Confirmed'} side-by-side: `).join('')}</tbody>
+    </table>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+/**
+ * Print all appointments
+ */
+function printAllAppointments() {
+  if (allAppointments.length === 0) {
+    showToast('No appointments to print', 'error');
+    return;
+  }
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>All Appointments</title>
+    <style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f97316;color:white}</style>
+    </head>
+    <body>
+      <h2>VET FOR PET CLINIC - All Appointments</h2>
+      <p>Generated on: ${new Date().toLocaleString()}</p>
+      <td><thead><tr><th>Date</th><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead>
+      <tbody>${allAppointments.map(a => `<tr><td>${a.date}侧<td>${a.time}侧<td>${escapeHtml(a.petName)}侧<td>${escapeHtml(a.ownerName)}侧<td>${a.token}侧<td>${a.status || 'Confirmed'}侧)`).join('')}</tbody>
+    </table>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+/**
+ * Print prescriptions list
+ */
+function printPrescriptions() {
+  const prescriptions = allAppointments.filter(a => a.prescription && a.prescription !== '');
+  
+  if (prescriptions.length === 0) {
+    showToast('No prescriptions to print', 'error');
+    return;
+  }
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Prescriptions</title>
+    <style>body{font-family:Arial;padding:20px}.prescription{border:1px solid #ccc;padding:15px;margin-bottom:20px;border-radius:8px}</style>
+    </head>
+    <body>
+      <h2>VET FOR PET CLINIC - Prescriptions</h2>
+      ${prescriptions.map(a => `<div class="prescription"><h3>${escapeHtml(a.petName)} (${a.token})</h3><p><strong>Date:</strong> ${a.date}</p><p><strong>Diagnosis:</strong> ${escapeHtml(a.diagnosis || 'N/A')}</p><p><strong>Prescription:</strong><br>${escapeHtml(a.prescription)}</p></div>`).join('')}
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+/**
+ * Print doctor performance report
+ */
+function printDoctorReport() {
+  const total = getElement('reportTotal')?.innerText || '0';
+  const completed = getElement('reportCompleted')?.innerText || '0';
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Doctor Report</title>
+    <style>body{font-family:Arial;padding:20px}</style>
+    </head>
+    <body>
+      <h2>VET FOR PET CLINIC - Doctor Performance Report</h2>
+      <p><strong>Total Patients:</strong> ${total}</p>
+      <p><strong>Completed:</strong> ${completed}</p>
+      <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+/**
+ * Print single appointment
+ * @param {string} bookingId - Booking ID to print
+ */
+function printSingleAppointment(bookingId) {
+  const app = allAppointments.find(a => a.bookingId === bookingId);
+  if (!app) return;
+  
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Appointment - ${app.token}</title>
+    <style>body{font-family:Arial;padding:20px}.header{text-align:center;margin-bottom:20px}</style>
+    </head>
+    <body>
+      <div class="header"><h2>VET FOR PET CLINIC</h2><p>Dhaka, Bangladesh | 01609-420061</p></div>
+      <h3>Appointment Details</h3>
+      <p><strong>Token:</strong> ${app.token}<br><strong>Date:</strong> ${app.date}<br><strong>Pet:</strong> ${app.petName}<br><strong>Owner:</strong> ${app.ownerName}<br><strong>Phone:</strong> ${app.ownerPhone}<br><strong>Symptoms:</strong> ${app.symptoms||'N/A'}<br><strong>Diagnosis:</strong> ${app.diagnosis||'N/A'}<br><strong>Prescription:</strong><br>${app.prescription||'N/A'}</p>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.print();
+}
+
+/**
+ * Edit profile - opens edit profile modal
+ */
+function editProfile() {
+  openEditProfileModal();
+}
+
+// ============================================
+// SECTION 21: UI CARD GENERATORS
+// ============================================
+
+/**
+ * Create appointment card HTML
+ * @param {Object} app - Appointment object
+ * @returns {string} HTML string
+ */
+function createAppointmentCard(app) {
+  const statusClass = app.status === 'Completed' ? 'completed' : (app.status === 'Cancelled' ? 'cancelled' : 'confirmed');
+  
+  return `
+    <div class="appointment-card" onclick="viewAppointment('${app.bookingId}')">
+      <div class="card-header">
+        <span class="token">${app.token}</span>
+        <span class="status ${statusClass}">${app.status || 'Confirmed'}</span>
+        <small>${app.time}</small>
+      </div>
+      <div><strong>${escapeHtml(app.petName)}</strong> (${escapeHtml(app.petAge || 'N/A')})</div>
+      <div>${escapeHtml(app.ownerName)} | ${app.ownerPhone}</div>
+      <div><strong>Symptoms:</strong> ${escapeHtml(app.symptoms || 'N/A')}</div>
+      ${app.diagnosis ? `<div><strong>Diagnosis:</strong> ${escapeHtml(app.diagnosis)}</div>` : ''}
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <button class="btn-primary" onclick="event.stopPropagation(); openMedicalModal('${app.bookingId}')">Medical</button>
+        <button class="btn-print" onclick="event.stopPropagation(); printSingleAppointment('${app.bookingId}')">Print</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Create history item HTML
+ * @param {Object} app - Appointment object
+ * @returns {string} HTML string
+ */
+function createHistoryItem(app) {
+  const statusClass = app.status === 'Completed' ? 'completed' : (app.status === 'Cancelled' ? 'cancelled' : 'confirmed');
+  
+  return `
+    <div class="history-item" onclick="viewAppointment('${app.bookingId}')">
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+        <div>
+          <strong>${escapeHtml(app.petName)}</strong>
+          <div style="font-size: 0.8rem;">📅 ${app.date} | ⏰ ${app.time}</div>
+        </div>
+        <div>
+          <span class="token">${app.token}</span>
+          <span class="status ${statusClass}" style="margin-left: 8px;">${app.status || 'Confirmed'}</span>
+        </div>
+      </div>
+      <div style="margin: 8px 0;">👤 ${escapeHtml(app.ownerName)} | 📞 ${app.ownerPhone}</div>
+      ${app.diagnosis ? `<div>🩺 ${escapeHtml(app.diagnosis)}</div>` : ''}
+    </div>
+  `;
+}
+
+// ============================================
+// SECTION 22: UTILITY FUNCTIONS
+// ============================================
+
+/**
+ * Escape HTML to prevent XSS attacks
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
 function escapeHtml(text) {
   if (!text) return '';
   const div = document.createElement('div');
@@ -1035,39 +1632,91 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+/**
+ * Show toast notification
+ * @param {string} message - Message to display
+ * @param {string} type - Type ('success', 'error', 'info')
+ */
 function showToast(message, type) {
-  let toast = document.querySelector('.toast-notification');
+  let toast = getElement('toast');
   if (!toast) {
     toast = document.createElement('div');
+    toast.id = 'toast';
     toast.className = 'toast-notification';
     document.body.appendChild(toast);
-    toast.style.cssText = 'position:fixed;bottom:30px;right:30px;padding:12px 24px;border-radius:50px;color:white;z-index:9999;transition:0.3s';
+    toast.style.cssText = 'position: fixed; bottom: 30px; right: 30px; padding: 12px 24px; border-radius: 50px; color: white; z-index: 9999; transition: transform 0.3s ease;';
   }
-  toast.style.background = type === 'success' ? '#15803d' : '#ef4444';
-  toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+  
+  toast.style.background = type === 'success' ? '#15803d' : (type === 'error' ? '#ef4444' : '#0ea5e9');
+  toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : (type === 'error' ? 'exclamation-circle' : 'info-circle')}"></i> ${message}`;
   toast.style.transform = 'translateX(0)';
-  setTimeout(() => toast.style.transform = 'translateX(400px)', 3000);
+  
+  setTimeout(() => {
+    toast.style.transform = 'translateX(400px)';
+  }, 3000);
 }
 
-// Logout functions
+/**
+ * Setup modal close functionality (ESC key, click outside)
+ */
+function setupModalClose() {
+  const closeButtons = document.querySelectorAll('.modal-close, .close-modal');
+  closeButtons.forEach(btn => {
+    if (btn) {
+      btn.onclick = function() {
+        closeMedicalModal();
+        closeViewModal();
+        closeLogoutModal();
+        closeEditProfileModal();
+      };
+    }
+  });
+  
+  window.onclick = function(e) {
+    if (e.target.classList && e.target.classList.contains('modal')) {
+      closeMedicalModal();
+      closeViewModal();
+      closeLogoutModal();
+      closeEditProfileModal();
+    }
+  };
+  
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeMedicalModal();
+      closeViewModal();
+      closeLogoutModal();
+      closeEditProfileModal();
+    }
+  });
+}
+
+/**
+ * Show logout confirmation modal
+ */
 function showLogoutModal() {
-  const modal = document.getElementById('logoutModal');
+  const modal = getElement('logoutModal');
   if (modal) {
     modal.classList.add('show');
     modal.style.display = 'flex';
   }
 }
 
+/**
+ * Close logout confirmation modal
+ */
 function closeLogoutModal() {
-  const modal = document.getElementById('logoutModal');
+  const modal = getElement('logoutModal');
   if (modal) {
     modal.classList.remove('show');
     modal.style.display = 'none';
   }
 }
 
+/**
+ * Confirm logout and redirect to login page
+ */
 function confirmLogout() {
-  if (autoSyncInterval) clearInterval(autoSyncInterval);
   sessionStorage.clear();
-  window.location.href = 'admin-login.html';
+  window.location.href = 'doctor-login.html';
 }

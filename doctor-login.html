@@ -25,7 +25,6 @@
     .login-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(249,115,22,0.3); }
     .error-message { background: #fef2f2; color: #ef4444; padding: 12px; border-radius: 12px; margin-bottom: 20px; display: none; font-size: 0.85rem; }
     .demo-credentials { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: center; }
-    .demo-credentials p { font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; }
     .demo-badge { display: inline-flex; gap: 16px; background: #f1f5f9; padding: 8px 16px; border-radius: 50px; font-size: 0.7rem; font-family: monospace; }
     .back-link { text-align: center; margin-top: 20px; }
     .back-link a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
@@ -51,24 +50,36 @@
       <button type="submit" class="login-btn"><i class="fas fa-sign-in-alt"></i> Login</button>
     </form>
     <div class="demo-credentials">
-      <p>🔐 Demo Access</p>
-      <div class="demo-badge"><span><strong>📧 Email:</strong> doctor@vetforpet.com</span><span><strong>🔑 Password:</strong> doctor123</span></div>
+      <p>Demo Access</p>
+      <div class="demo-badge"><span><strong>Email:</strong> doctor@vetforpet.com</span><span><strong>Password:</strong> doctor123</span></div>
     </div>
-    <div class="back-link"><a href="index.html"><i class="fas fa-arrow-left"></i> Back to Patient Portal</a></div>
+    <div class="back-link"><a href="../index.html"><i class="fas fa-arrow-left"></i> Back to Patient Portal</a></div>
   </div>
 </div>
 <script>
-  const DOCTOR_CREDENTIALS = { email: "doctor@vetforpet.com", password: "doctor123", name: "Dr. Mitesh Tripura", role: "Senior Veterinarian", specialization: "Cardiology & Surgery" };
+  const DOCTOR_CREDENTIALS = { 
+    email: "doctor@vetforpet.com", 
+    password: "doctor123", 
+    name: "Dr. Mitesh Tripura", 
+    role: "Senior Veterinarian", 
+    specialization: "Cardiology & Surgery",
+    phone: "01406779238",
+    schedule: "Sat-Wed 9AM-9PM"
+  };
+  
   document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
+    
     if (username === DOCTOR_CREDENTIALS.email && password === DOCTOR_CREDENTIALS.password) {
       sessionStorage.setItem('doctor_logged_in', 'true');
       sessionStorage.setItem('doctor_name', DOCTOR_CREDENTIALS.name);
       sessionStorage.setItem('doctor_role', DOCTOR_CREDENTIALS.role);
       sessionStorage.setItem('doctor_email', DOCTOR_CREDENTIALS.email);
       sessionStorage.setItem('doctor_specialization', DOCTOR_CREDENTIALS.specialization);
+      sessionStorage.setItem('doctor_phone', DOCTOR_CREDENTIALS.phone);
+      sessionStorage.setItem('doctor_schedule', DOCTOR_CREDENTIALS.schedule);
       window.location.href = 'doctor-dashboard.html';
     } else {
       const errorDiv = document.getElementById('errorMessage');

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login | VET FOR PET</title>
+  <title>Admin Login | VET FOR PET CLINIC</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <style>
@@ -25,8 +25,10 @@
     .login-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(249,115,22,0.3); }
     .error-message { background: #fef2f2; color: #ef4444; padding: 12px; border-radius: 12px; margin-bottom: 20px; display: none; font-size: 0.85rem; }
     .demo-credentials { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: center; }
-    .demo-credentials p { font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; }
     .demo-badge { display: inline-flex; gap: 16px; background: #f1f5f9; padding: 8px 16px; border-radius: 50px; font-size: 0.7rem; font-family: monospace; }
+    .user-type-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+    .user-type-btn { flex: 1; padding: 10px; background: #f1f5f9; border: none; border-radius: 12px; cursor: pointer; font-weight: 500; transition: all 0.3s; }
+    .user-type-btn.active { background: #f97316; color: white; }
     .back-link { text-align: center; margin-top: 20px; }
     .back-link a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
     .back-link a:hover { color: #f97316; }
@@ -40,52 +42,75 @@
       <h1>Admin Portal</h1>
       <p>VET FOR PET CLINIC</p>
     </div>
+    <div class="user-type-selector">
+      <button class="user-type-btn active" data-type="super_admin">Super Admin</button>
+      <button class="user-type-btn" data-type="manager">Manager</button>
+      <button class="user-type-btn" data-type="receptionist">Receptionist</button>
+    </div>
     <div id="errorMessage" class="error-message"><i class="fas fa-exclamation-circle"></i> Invalid credentials</div>
     <form id="loginForm">
       <div class="form-group">
-        <div class="input-with-icon">
-          <i class="fas fa-envelope"></i>
-          <input type="text" id="username" placeholder="admin@vetforpet.com" autocomplete="off">
-        </div>
+        <div class="input-with-icon"><i class="fas fa-envelope"></i><input type="text" id="username" placeholder="Email or Username" autocomplete="off"></div>
       </div>
       <div class="form-group">
-        <div class="input-with-icon">
-          <i class="fas fa-lock"></i>
-          <input type="password" id="password" placeholder="Enter your password">
-        </div>
+        <div class="input-with-icon"><i class="fas fa-lock"></i><input type="password" id="password" placeholder="Enter your password"></div>
       </div>
       <button type="submit" class="login-btn"><i class="fas fa-sign-in-alt"></i> Login</button>
     </form>
     <div class="demo-credentials">
-      <p>🔐 Demo Access</p>
-      <div class="demo-badge">
-        <span><strong>📧 Email:</strong> admin@vetforpet.com</span>
-        <span><strong>🔑 Password:</strong> admin123</span>
+      <p>Demo Access</p>
+      <div class="demo-badge" id="demoCredentials">
+        <span><strong>Super Admin:</strong> admin@vetforpet.com / admin123</span>
       </div>
     </div>
-    <div class="back-link">
-      <a href="index.html"><i class="fas fa-arrow-left"></i> Back to Patient Portal</a>
-    </div>
+    <div class="back-link"><a href="../index.html"><i class="fas fa-arrow-left"></i> Back to Patient Portal</a></div>
   </div>
 </div>
 <script>
-  const ADMIN_CREDENTIALS = {
-    email: "admin@vetforpet.com",
-    password: "admin123",
-    name: "Super Admin",
-    role: "Administrator"
+  const USERS = {
+    super_admin: { email: "admin@vetforpet.com", password: "admin123", name: "Super Admin", role: "super_admin", permissions: "full" },
+    manager: { email: "manager@vetforpet.com", password: "manager123", name: "Clinic Manager", role: "manager", permissions: "view_appointments,add_appointments,edit_appointments,manage_doctors,manage_services,reports" },
+    receptionist: { email: "reception@vetforpet.com", password: "reception123", name: "Receptionist", role: "receptionist", permissions: "view_appointments,add_appointments,edit_appointments" }
   };
+  
+  let selectedUserType = 'super_admin';
+  
+  document.querySelectorAll('.user-type-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.user-type-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      selectedUserType = this.getAttribute('data-type');
+      const demoSpan = document.getElementById('demoCredentials');
+      if (selectedUserType === 'super_admin') {
+        demoSpan.innerHTML = '<span><strong>Super Admin:</strong> admin@vetforpet.com / admin123</span>';
+      } else if (selectedUserType === 'manager') {
+        demoSpan.innerHTML = '<span><strong>Manager:</strong> manager@vetforpet.com / manager123</span>';
+      } else {
+        demoSpan.innerHTML = '<span><strong>Receptionist:</strong> reception@vetforpet.com / reception123</span>';
+      }
+    });
+  });
   
   document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
     
-    if (username === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+    let user = null;
+    for (let [role, creds] of Object.entries(USERS)) {
+      if (creds.email === username && creds.password === password && role === selectedUserType) {
+        user = { ...creds, userType: creds.role };
+        break;
+      }
+    }
+    
+    if (user) {
       sessionStorage.setItem('admin_logged_in', 'true');
-      sessionStorage.setItem('admin_name', ADMIN_CREDENTIALS.name);
-      sessionStorage.setItem('admin_role', ADMIN_CREDENTIALS.role);
-      sessionStorage.setItem('admin_email', ADMIN_CREDENTIALS.email);
+      sessionStorage.setItem('admin_name', user.name);
+      sessionStorage.setItem('admin_role', user.role);
+      sessionStorage.setItem('admin_email', user.email);
+      sessionStorage.setItem('admin_permissions', user.permissions);
+      sessionStorage.setItem('admin_user_type', user.userType);
       window.location.href = 'admin-dashboard.html';
     } else {
       const errorDiv = document.getElementById('errorMessage');
