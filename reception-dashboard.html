@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Reception Dashboard | VET FOR PET CLINIC</title>
+  <!-- ============================================ -->
+  <!-- SECTION 1: EXTERNAL STYLESHEETS & FONTS      -->
+  <!-- ============================================ -->
+  <link rel="stylesheet" href="admin-styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  
+  <!-- ============================================ -->
+  <!-- SECTION 2: RECEPTION DASHBOARD CUSTOM STYLES -->
+  <!-- ============================================ -->
+  <style>
+    /* ============================================ */
+    /* RECEPTION DASHBOARD - COMPLETE CUSTOM STYLES */
+    /* ============================================ */
+
+    /* রিসেপশনিস্টের জন্য শুধু প্রয়োজনীয় মেনু দেখাবে */
+    .sidebar-nav .nav-item[data-permission="manage_doctors"],
+    .sidebar-nav .nav-item[data-permission="manage_services"],
+    .sidebar-nav .nav-item[data-permission="full"]:not([data-page="dashboard"]):not([data-page="appointments"]):not([data-page="reports"]):not([data-page="profile"]) {
+      display: none !important;
+    }
+    
+    /* নিউ বুকিং বাটন বিশেষ স্টাইল */
+    .btn-new-booking {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+    .btn-new-booking:hover {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      transform: translateY(-2px);
+    }
+    
+    /* স্ট্যাটাস বেজ স্টাইল */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .status-badge.confirmed { background: #fef3c7; color: #d97706; }
+    .status-badge.completed { background: #dcfce7; color: #15803d; }
+    .status-badge.cancelled { background: #fee2e2; color: #dc2626; }
+    .status-badge.progress { background: #e0e7ff; color: #4f46e5; }
+    
+    /* টাইম স্লট সিলেক্টর স্টাইল */
+    .time-slot-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 250px;
+      overflow-y: auto;
+      padding: 5px;
+    }
+    .time-slot {
+      padding: 8px;
+      background: #f1f5f9;
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    .time-slot:hover:not(.booked) {
+      background: #fed7aa;
+      transform: scale(1.02);
+    }
+    .time-slot.selected {
+      background: #f97316;
+      color: white;
+      border-color: #1e293b;
+    }
+    .time-slot.booked {
+      background: #e2e8f0;
+      color: #94a3b8;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+    
+    /* ভিউ অনলি স্টাইল - কোন এডিট/ডিলিট বাটন দেখাবে না */
+    .appointments-list .action-buttons,
+    .history-item .btn-edit,
+    .history-item .btn-delete {
+      display: none !important;
+    }
+    
+    /* রিপোর্ট টেবিল স্টাইল */
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    .report-table th, .report-table td {
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      text-align: left;
+    }
+    .report-table th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+    
+    /* এম্পটি স্টেট */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+    
+    /* লোডিং স্টেট */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+
+    /* ============================================ */
+    /* PROFILE PAGE & EDIT PROFILE MODAL STYLES     */
+    /* ============================================ */
+    
+    /* Profile Card Styles */
+    .profile-card {
+        background: white;
+        border-radius: 24px;
+        padding: 30px;
+        display: flex;
+        gap: 40px;
+        flex-wrap: wrap;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-top: 20px;
+    }
+
+    /* Profile Avatar Section */
+    .profile-avatar-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    /* Profile Avatar Circle */
+    .profile-avatar {
+        width: 150px;
+        height: 150px;
+        background: linear-gradient(135deg, #f97316, #ea580c);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        border: 3px solid white;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+    }
+
+    /* Profile Avatar Image */
+    .profile-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Profile Avatar Icon (fallback) */
+    .profile-avatar i {
+        font-size: 64px;
+        color: white;
+    }
+
+    /* Change Avatar Button */
+    .btn-change-avatar {
+        background: #f1f5f9;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #1e293b;
+    }
+
+    .btn-change-avatar:hover {
+        background: #f97316;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    /* Profile Information Container */
+    .profile-info {
+        flex: 1;
+        min-width: 250px;
+    }
+
+    /* Individual Info Row */
+    .info-row {
+        display: flex;
+        margin-bottom: 15px;
+        padding: 8px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* Info Row Label */
+    .info-row label {
+        width: 120px;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    /* Info Row Value */
+    .info-row span {
+        color: #0f172a;
+        font-weight: 500;
+    }
+
+    /* ============================================ */
+    /* EDIT PROFILE MODAL AVATAR STYLES            */
+    /* ============================================ */
+
+    /* Avatar Upload Section in Modal */
+    .avatar-upload-section {
+        text-align: center;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* Avatar Preview in Modal */
+    .avatar-preview {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #f97316, #ea580c);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+        overflow: hidden;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Avatar Preview Image */
+    .avatar-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Avatar Preview Icon (fallback) */
+    .avatar-preview i {
+        font-size: 48px;
+        color: white;
+    }
+
+    /* Avatar Upload Buttons Container */
+    .avatar-upload-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 8px;
+    }
+
+    /* Upload Image Button */
+    .avatar-upload-buttons .btn-upload-img {
+        background: #f1f5f9;
+        color: #1e293b;
+        padding: 8px 16px;
+        border-radius: 50px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: none;
+        transition: all 0.3s;
+    }
+
+    /* Remove Image Button */
+    .avatar-upload-buttons .btn-remove-img {
+        background: #f1f5f9;
+        color: #1e293b;
+        padding: 8px 16px;
+        border-radius: 50px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: none;
+        transition: all 0.3s;
+    }
+
+    /* Upload Image Button Hover */
+    .avatar-upload-buttons .btn-upload-img:hover {
+        background: #22c55e;
+        color: white;
+    }
+
+    /* Remove Image Button Hover */
+    .avatar-upload-buttons .btn-remove-img:hover {
+        background: #ef4444;
+        color: white;
+    }
+
+    /* ============================================ */
+    /* RESPONSIVE PROFILE PAGE STYLES              */
+    /* ============================================ */
+
+    /* Tablet and Mobile Responsive */
+    @media (max-width: 768px) {
+        .profile-card {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .info-row {
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .info-row label {
+            width: auto;
+        }
+    }
+
+    /* Small Mobile Responsive */
+    @media (max-width: 480px) {
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+        }
+        
+        .profile-avatar i {
+            font-size: 48px;
+        }
+        
+        .profile-card {
+            padding: 20px;
+        }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- SECTION 3: LOGOUT MODAL                     -->
+<!-- ============================================ -->
+<div id="logoutModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-icon warning">
+      <i class="fas fa-sign-out-alt"></i>
+    </div>
+    <div class="modal-content-custom">
+      <h3 class="modal-title-custom">Logout Confirmation</h3>
+      <p class="modal-message">Are you sure you want to logout from Reception Panel?</p>
+      <div class="modal-buttons-custom">
+        <button class="btn-cancel" onclick="closeLogoutModal()"><i class="fas fa-times"></i> Cancel</button>
+        <button class="btn-logout" onclick="confirmLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 4: PERMISSION DENIED MODAL          -->
+<!-- ============================================ -->
+<div id="permissionDeniedModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-icon danger">
+      <i class="fas fa-lock"></i>
+    </div>
+    <div class="modal-content-custom">
+      <h3 class="modal-title-custom">Access Denied</h3>
+      <p class="modal-message">You don't have permission to access this section.</p>
+      <div class="modal-buttons-custom">
+        <button class="btn-primary-custom" onclick="closePermissionModal()"><i class="fas fa-check"></i> OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 5: TOAST NOTIFICATIONS               -->
+<!-- ============================================ -->
+<div id="successToast" class="toast-notification success">
+  <i class="fas fa-check-circle"></i> <span id="successMsg"></span>
+</div>
+<div id="errorToast" class="toast-notification error">
+  <i class="fas fa-exclamation-circle"></i> <span id="errorMsg"></span>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 6: NEW BOOKING MODAL                 -->
+<!-- ============================================ -->
+<div id="newBookingModal" class="modal">
+  <div class="modal-card modal-lg">
+    <div class="modal-header-custom">
+      <div class="modal-title-custom">
+        <i class="fas fa-calendar-plus"></i>
+        <h3>New Appointment Booking</h3>
+      </div>
+      <button class="modal-close" onclick="closeNewBookingModal()">&times;</button>
+    </div>
+    <div class="modal-body-custom">
+      <!-- পেশেন্ট ইনফরমেশন ফর্ম -->
+      <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="form-group-custom">
+          <label><i class="fas fa-paw"></i> Pet Name *</label>
+          <input type="text" id="newPetName" class="clean-input" placeholder="e.g., Max, Bella">
+        </div>
+        <div class="form-group-custom">
+          <label><i class="fas fa-calendar"></i> Pet Age</label>
+          <input type="text" id="newPetAge" class="clean-input" placeholder="e.g., 2 years / 3 months">
+        </div>
+      </div>
+      
+      <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+        <div class="form-group-custom">
+          <label><i class="fas fa-user"></i> Owner Name *</label>
+          <input type="text" id="newOwnerName" class="clean-input" placeholder="Full name">
+        </div>
+        <div class="form-group-custom">
+          <label><i class="fas fa-phone"></i> Phone Number *</label>
+          <input type="tel" id="newOwnerPhone" class="clean-input" placeholder="01XXXXXXXXX">
+        </div>
+      </div>
+      
+      <div class="form-group-custom" style="margin-top: 16px;">
+        <label><i class="fas fa-stethoscope"></i> Symptoms / Reason</label>
+        <textarea id="newSymptoms" rows="2" class="clean-textarea" placeholder="Describe the problem"></textarea>
+      </div>
+      
+      <!-- ডেট এবং টাইম সিলেক্টর -->
+      <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+        <div class="form-group-custom">
+          <label><i class="fas fa-calendar-alt"></i> Select Date *</label>
+          <input type="date" id="newBookingDate" class="clean-input">
+        </div>
+        <div class="form-group-custom">
+          <label><i class="fas fa-clock"></i> Select Time *</label>
+          <div id="timeSlotContainer" class="time-slot-selector">
+            <!-- টাইম স্লট এখানে ডায়নামিক্যালি লোড হবে -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-group-custom" style="margin-top: 16px;">
+        <label><i class="fas fa-tag"></i> Service Type</label>
+        <select id="newServiceType" class="clean-input">
+          <option value="General Consultation">General Consultation</option>
+          <option value="Vaccination">Vaccination</option>
+          <option value="Emergency">Emergency</option>
+          <option value="Surgery">Surgery</option>
+          <option value="Follow-up">Follow-up</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer-custom">
+      <button class="btn-secondary-custom" onclick="closeNewBookingModal()">Cancel</button>
+      <button class="btn-primary-custom" onclick="createNewBooking()">
+        <i class="fas fa-save"></i> Book Appointment
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 7: VIEW APPOINTMENT MODAL (VIEW ONLY) -->
+<!-- ============================================ -->
+<div id="viewAppointmentModal" class="modal">
+  <div class="modal-card modal-lg">
+    <div class="modal-header-custom">
+      <div class="modal-title-custom">
+        <i class="fas fa-file-medical"></i>
+        <h3>Appointment Details</h3>
+      </div>
+      <button class="modal-close" onclick="closeViewAppointmentModal()">&times;</button>
+    </div>
+    <div class="modal-body-custom" id="appointmentDetails"></div>
+    <div class="modal-footer-custom">
+      <button class="btn-secondary-custom" onclick="closeViewAppointmentModal()">Close</button>
+      <button class="btn-print-custom" onclick="printAppointmentDetails()">
+        <i class="fas fa-print"></i> Print
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 8: EDIT PROFILE MODAL                -->
+<!-- ============================================ -->
+<div id="editProfileModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-header-custom">
+      <div class="modal-title-custom">
+        <i class="fas fa-user-edit"></i>
+        <h3>Edit Profile</h3>
+      </div>
+      <button class="modal-close" onclick="closeEditProfileModal()">&times;</button>
+    </div>
+    <div class="modal-body-custom">
+      <!-- Avatar Upload Section for Edit Profile -->
+      <div class="avatar-upload-section">
+        <div class="avatar-preview" id="editAvatarPreview">
+          <img id="editAvatarImg" src="" style="display:none">
+          <i class="fas fa-user-circle" id="editAvatarIcon"></i>
+        </div>
+        <div class="avatar-upload-buttons">
+          <label class="btn-upload-img">
+            <i class="fas fa-upload"></i> Choose Image
+            <input type="file" id="profileImageUploadModal" accept="image/*" style="display:none">
+          </label>
+          <button type="button" class="btn-remove-img" onclick="removeProfileImage()">
+            <i class="fas fa-trash-alt"></i> Remove
+          </button>
+        </div>
+      </div>
+      <div class="form-group-custom">
+        <label>Full Name</label>
+        <input type="text" id="editProfileName" class="clean-input">
+      </div>
+      <div class="form-group-custom">
+        <label>Email</label>
+        <input type="email" id="editProfileEmail" class="clean-input">
+      </div>
+      <div class="form-group-custom">
+        <label>Phone Number</label>
+        <input type="text" id="editProfilePhone" class="clean-input">
+      </div>
+      <div class="form-group-custom">
+        <label>New Password</label>
+        <input type="password" id="editProfilePassword" class="clean-input" placeholder="Leave blank to keep same">
+      </div>
+    </div>
+    <div class="modal-footer-custom">
+      <button class="btn-secondary-custom" onclick="closeEditProfileModal()">Cancel</button>
+      <button class="btn-primary-custom" onclick="saveProfileChanges()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 9: MAIN DASHBOARD CONTAINER          -->
+<!-- ============================================ -->
+<div class="dashboard-container">
+  
+  <!-- ===== SIDEBAR (রিসেপশনিস্ট ভিউ) ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-icon"><i class="fas fa-headset"></i></div>
+      <h2>RECEPTION</h2>
+      <span class="role-badge" id="userRoleBadge">Receptionist</span>
+    </div>
+    
+    <!-- শুধু রিসেপশনিস্টের জন্য প্রয়োজনীয় মেনু -->
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard">
+        <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="appointments">
+        <i class="fas fa-calendar-check"></i><span>Appointments</span>
+        <span class="badge" id="appointmentBadge">0</span>
+      </a>
+      <a href="#" class="nav-item" data-page="reports">
+        <i class="fas fa-chart-line"></i><span>Reports</span>
+      </a>
+      <a href="#" class="nav-item" data-page="profile">
+        <i class="fas fa-user-circle"></i><span>My Profile</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-avatar"><i class="fas fa-smile"></i></div>
+        <div>
+          <strong id="adminName">Receptionist</strong>
+          <small id="adminRole">Receptionist</small>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="showLogoutModal()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main-dashboard">
+    
+    <!-- ===== HEADER ===== -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <h1 id="pageTitle">Reception Dashboard</h1>
+        <p>Welcome, <span id="welcomeName">Receptionist</span></p>
+      </div>
+      <div class="header-right">
+        <div class="date-time-box">
+          <div><i class="fas fa-calendar-alt"></i> <span id="currentDate"></span></div>
+          <div><i class="fas fa-clock"></i> <span id="currentTime"></span></div>
+          <div><i class="fas fa-globe-asia"></i> <span>BDT</span></div>
+        </div>
+        <div class="sync-status" id="syncStatus">
+          <i class="fas fa-check-circle"></i> Synced
+        </div>
+        <div class="refresh-btn" onclick="refreshAllData()">
+          <i class="fas fa-sync-alt"></i>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- SECTION 10: DASHBOARD PAGE                   -->
+    <!-- ============================================ -->
+    <div id="dashboardPage" class="page-content active">
+      <!-- স্ট্যাটিস্টিক্স কার্ড -->
+      <div class="stats-row">
+        <div class="stat-card primary">
+          <div class="stat-icon"><i class="fas fa-calendar-today"></i></div>
+          <div class="stat-info">
+            <h3 id="totalToday">0</h3>
+            <p>Today's Appointments</p>
+          </div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+          <div class="stat-info">
+            <h3 id="totalWeekly">0</h3>
+            <p>This Week</p>
+          </div>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-icon"><i class="fas fa-calendar-month"></i></div>
+          <div class="stat-info">
+            <h3 id="totalMonthly">0</h3>
+            <p>This Month</p>
+          </div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-icon"><i class="fas fa-paw"></i></div>
+          <div class="stat-info">
+            <h3 id="totalPets">0</h3>
+            <p>Total Pets Treated</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- কুইক অ্যাকশন বাটন (শুধু বুকিং, ভিউ, এক্সপোর্ট, রিফ্রেশ) -->
+      <div class="quick-actions">
+        <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+        <div class="action-buttons">
+          <button onclick="openNewBookingModal()" class="btn-new-booking">
+            <i class="fas fa-plus-circle"></i> New Booking
+          </button>
+          <button onclick="goToPage('appointments')">
+            <i class="fas fa-list"></i> View All
+          </button>
+          <button onclick="exportToCSV()">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+          <button onclick="refreshAllData()">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+      
+      <!-- সাম্প্রতিক অ্যাপয়েন্টমেন্ট এবং কুইক স্ট্যাট্স -->
+      <div class="row-2cols">
+        <div class="recent-section">
+          <div class="section-header">
+            <h3><i class="fas fa-history"></i> Recent Appointments</h3>
+            <a href="#" onclick="goToPage('appointments'); return false;">View All →</a>
+          </div>
+          <div id="recentAppointments" class="appointments-list"></div>
+        </div>
+        <div class="stats-section-small">
+          <div class="section-header">
+            <h3><i class="fas fa-chart-pie"></i> Quick Stats</h3>
+          </div>
+          <div class="mini-stats">
+            <div class="mini-stat">
+              <span class="mini-label">Today Completed</span>
+              <span class="mini-value" id="todayCompleted">0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-label">Pending Appointments</span>
+              <span class="mini-value" id="pendingCount">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 11: APPOINTMENTS PAGE (VIEW ONLY)    -->
+    <!-- ============================================ -->
+    <div id="appointmentsPage" class="page-content">
+      <div class="page-header">
+        <h2><i class="fas fa-list"></i> All Appointments</h2>
+        <div class="filter-bar">
+          <input type="text" id="filterInput" placeholder="🔍 Search by pet, owner, phone or token..." onkeyup="filterAppointments()">
+          <select id="statusFilter" onchange="filterAppointments()">
+            <option value="all">All Status</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+          <select id="dateFilter" onchange="filterAppointments()">
+            <option value="all">All Dates</option>
+            <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+          <button onclick="openNewBookingModal()" class="btn-primary">
+            <i class="fas fa-plus"></i> New Booking
+          </button>
+          <button onclick="exportToCSV()" class="btn-export">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+          <button onclick="printAllAppointments()" class="btn-print">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
+      </div>
+      <div id="allAppointmentsList" class="appointments-list"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 12: REPORTS PAGE (VIEW ONLY)         -->
+    <!-- ============================================ -->
+    <div id="reportsPage" class="page-content">
+      <div class="page-header">
+        <h2><i class="fas fa-chart-line"></i> Appointment Reports</h2>
+        <div class="report-filters">
+          <select id="reportType" onchange="loadReport()">
+            <option value="daily">Daily Report</option>
+            <option value="weekly">Weekly Report</option>
+            <option value="monthly">Monthly Report</option>
+          </select>
+          <input type="date" id="reportDate" onchange="loadReport()">
+          <button onclick="loadReport()" class="btn-primary">Generate</button>
+          <button onclick="printReport()" class="btn-print">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
+      </div>
+      <div class="report-container" id="reportContainer"></div>
+      <canvas id="reportChart" style="max-height: 300px; margin-top: 30px;"></canvas>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SECTION 13: PROFILE PAGE (UPDATED WITH STYLES) -->
+    <!-- ============================================ -->
+    <div id="profilePage" class="page-content">
+      <div class="page-header">
+        <h2><i class="fas fa-user-circle"></i> My Profile</h2>
+        <button onclick="openEditProfileModal()" class="btn-primary">
+          <i class="fas fa-edit"></i> Edit Profile
+        </button>
+      </div>
+      <!-- Profile Card with Enhanced Styles -->
+      <div class="profile-card">
+        <div class="profile-avatar-section">
+          <div class="profile-avatar" id="profileAvatar">
+            <img id="profileAvatarImg" src="" style="display:none" alt="Profile Picture">
+            <i class="fas fa-user-circle" id="avatarIcon"></i>
+          </div>
+          <button class="btn-change-avatar" onclick="openAvatarUploadModal()">
+            <i class="fas fa-camera"></i> Change Photo
+          </button>
+        </div>
+        <div class="profile-info">
+          <div class="info-row"><label>Name:</label><span id="profileName"></span></div>
+          <div class="info-row"><label>Email:</label><span id="profileEmail"></span></div>
+          <div class="info-row"><label>Role:</label><span id="profileRole"></span></div>
+          <div class="info-row"><label>Phone:</label><span id="profilePhone"></span></div>
+          <div class="info-row"><label>Joined:</label><span id="profileJoined"></span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 14: HIDDEN FILE INPUTS               -->
+<!-- ============================================ -->
+<input type="file" id="profileImageUpload" accept="image/*" style="display:none">
+
+<!-- ============================================ -->
+<!-- SECTION 15: PAGE TRANSITION OVERLAY          -->
+<!-- ============================================ -->
+<div class="page-transition-overlay">
+  <div class="loader"></div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 16: SCRIPTS                          -->
+<!-- ============================================ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="reception-script.js"></script>
+</body>
+</html>

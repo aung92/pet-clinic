@@ -1,18 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- ============================================ -->
+  <!-- SECTION 1: META TAGS & PAGE TITLE             -->
+  <!-- ============================================ -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Admin Dashboard | VET FOR PET CLINIC</title>
+  
+  <!-- ============================================ -->
+  <!-- SECTION 2: EXTERNAL STYLESHEETS & FONTS      -->
+  <!-- ============================================ -->
   <link rel="stylesheet" href="admin-styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  
+  <!-- ============================================ -->
+  <!-- SECTION 3: INTERNAL STYLES (OVERRIDES)       -->
+  <!-- ============================================ -->
+  <style>
+    /* ডিসএবলড নেভিগেশন আইটেম স্টাইল */
+    .nav-item.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+    
+    /* টোস্ট নোটিফিকেশন স্টাইল */
+    .toast-notification {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 500;
+      z-index: 2000;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .toast-notification.show { transform: translateX(0); }
+    .toast-notification.success { background: #15803d; }
+    .toast-notification.error { background: #dc2626; }
+    .toast-notification.info { background: #0ea5e9; }
+    
+    /* পেজ ট্রানজিশন ওভারলে */
+    .page-transition-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    .page-transition-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .page-transition-overlay .loader {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(249,115,22,0.3);
+      border-top-color: #f97316;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* কী টেবিল স্টাইল */
+    .keys-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .keys-table th, .keys-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .keys-table th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+    .btn-danger-small {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.7rem;
+    }
+    .role-badge-receptionist, .role-badge-doctor, .role-badge-manager, .role-badge-admin {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .role-badge-receptionist { background: #8b5cf6; color: white; }
+    .role-badge-doctor { background: #3b82f6; color: white; }
+    .role-badge-manager { background: #f59e0b; color: white; }
+    .role-badge-admin { background: #ef4444; color: white; }
+  </style>
 </head>
 <body>
 
-<!-- ============================================
-     LOGOUT MODAL - MODERN DESIGN
-============================================ -->
+<!-- ============================================ -->
+<!-- SECTION 4: LOGOUT MODAL                      -->
+<!-- ============================================ -->
 <div id="logoutModal" class="modal">
   <div class="modal-card">
     <div class="modal-icon warning">
@@ -33,9 +146,9 @@
   </div>
 </div>
 
-<!-- ============================================
-     PERMISSION DENIED MODAL
-============================================ -->
+<!-- ============================================ -->
+<!-- SECTION 5: PERMISSION DENIED MODAL           -->
+<!-- ============================================ -->
 <div id="permissionDeniedModal" class="modal">
   <div class="modal-card">
     <div class="modal-icon danger">
@@ -53,9 +166,9 @@
   </div>
 </div>
 
-<!-- ============================================
-     TOAST NOTIFICATIONS
-============================================ -->
+<!-- ============================================ -->
+<!-- SECTION 6: TOAST NOTIFICATIONS               -->
+<!-- ============================================ -->
 <div id="successToast" class="toast-notification success">
   <i class="fas fa-check-circle"></i> <span id="successMsg"></span>
 </div>
@@ -63,12 +176,12 @@
   <i class="fas fa-exclamation-circle"></i> <span id="errorMsg"></span>
 </div>
 
-<!-- ============================================
-     MAIN DASHBOARD CONTAINER
-============================================ -->
+<!-- ============================================ -->
+<!-- SECTION 7: MAIN DASHBOARD CONTAINER          -->
+<!-- ============================================ -->
 <div class="dashboard-container">
   
-  <!-- SIDEBAR -->
+  <!-- ===== SIDEBAR SECTION ===== -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <div class="logo-icon"><i class="fas fa-user-shield"></i></div>
@@ -76,6 +189,7 @@
       <span class="role-badge" id="userRoleBadge">Super Admin</span>
     </div>
     
+    <!-- পারমিশন ভিত্তিক নেভিগেশন মেনু -->
     <nav class="sidebar-nav">
       <a href="#" class="nav-item active" data-page="dashboard" data-permission="full">
         <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
@@ -110,7 +224,10 @@
     <div class="sidebar-footer">
       <div class="admin-info">
         <div class="admin-avatar"><i class="fas fa-user-cog"></i></div>
-        <div><strong id="adminName">Admin</strong><small id="adminRole">Administrator</small></div>
+        <div>
+          <strong id="adminName">Admin</strong>
+          <small id="adminRole">Administrator</small>
+        </div>
       </div>
       <button class="logout-btn" onclick="showLogoutModal()">
         <i class="fas fa-sign-out-alt"></i> Logout
@@ -118,10 +235,10 @@
     </div>
   </aside>
 
-  <!-- MAIN CONTENT -->
+  <!-- ===== MAIN CONTENT SECTION ===== -->
   <main class="main-dashboard">
     
-    <!-- HEADER -->
+    <!-- ===== HEADER SECTION ===== -->
     <header class="dashboard-header">
       <div class="header-left">
         <h1 id="pageTitle">Dashboard</h1>
@@ -142,7 +259,7 @@
       </div>
     </header>
 
-    <!-- DASHBOARD PAGE -->
+    <!-- ===== DASHBOARD PAGE ===== -->
     <div id="dashboardPage" class="page-content active">
       <div class="stats-row">
         <div class="stat-card primary"><div class="stat-icon"><i class="fas fa-calendar-today"></i></div><div class="stat-info"><h3 id="totalToday">0</h3><p>Today's Appointments</p></div></div>
@@ -179,7 +296,7 @@
       </div>
     </div>
 
-    <!-- APPOINTMENTS PAGE -->
+    <!-- ===== APPOINTMENTS PAGE ===== -->
     <div id="appointmentsPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-list"></i> All Appointments</h2>
         <div class="filter-bar">
@@ -194,36 +311,37 @@
       <div class="pagination" id="pagination"></div>
     </div>
 
-    <!-- DOCTORS PAGE -->
+    <!-- ===== DOCTORS PAGE ===== -->
     <div id="doctorsPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-user-md"></i> Manage Doctors</h2><button onclick="showAddDoctorModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Doctor</button></div>
       <div id="doctorsList" class="doctors-list"></div>
     </div>
 
-    <!-- SERVICES PAGE -->
+    <!-- ===== SERVICES PAGE ===== -->
     <div id="servicesPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-stethoscope"></i> Manage Services</h2><button onclick="showAddServiceModal()" class="btn-primary"><i class="fas fa-plus"></i> Add Service</button></div>
       <div id="servicesList" class="services-list"></div>
     </div>
 
-    <!-- USERS PAGE -->
+    <!-- ===== USERS PAGE ===== -->
     <div id="usersPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-users"></i> User Management</h2><button onclick="showAddUserModal()" class="btn-primary"><i class="fas fa-user-plus"></i> Add User</button></div>
       <div id="usersList" class="users-list"></div>
     </div>
 
-    <!-- PERMISSIONS PAGE -->
+    <!-- ===== PERMISSIONS PAGE ===== -->
     <div id="permissionsPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-key"></i> Role & Permissions</h2></div>
       <div id="permissionsList" class="permissions-list"></div>
       <button onclick="savePermissions()" class="btn-primary" style="margin-top:20px"><i class="fas fa-save"></i> Save Permissions</button>
     </div>
 
-    <!-- SETTINGS PAGE -->
+    <!-- ===== SETTINGS PAGE (WITH ACCESS KEY GENERATOR) ===== -->
     <div id="settingsPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-cog"></i> System Settings</h2></div>
       <div class="settings-card">
-        <div class="settings-section"><h3><i class="fas fa-hospital"></i> Clinic Information</h3>
+        <div class="settings-section">
+          <h3><i class="fas fa-hospital"></i> Clinic Information</h3>
           <div class="settings-form">
             <div class="form-group"><label>Clinic Name</label><input type="text" id="clinicName" class="clean-input"></div>
             <div class="form-group"><label>Address</label><input type="text" id="clinicAddress" class="clean-input"></div>
@@ -233,12 +351,50 @@
           </div>
           <button onclick="saveSettings()" class="btn-primary"><i class="fas fa-save"></i> Save Settings</button>
         </div>
-        <div class="settings-section"><h3><i class="fas fa-clock"></i> Slot Configuration</h3><div class="slot-config" id="slotConfig"></div><button onclick="saveSlotConfig()" class="btn-primary"><i class="fas fa-save"></i> Save Slots</button></div>
-        <div class="settings-section"><h3><i class="fas fa-money-bill-wave"></i> Service Pricing</h3><div class="pricing-config" id="pricingConfig"></div><button onclick="savePricing()" class="btn-primary"><i class="fas fa-save"></i> Save Pricing</button></div>
+        <div class="settings-section">
+          <h3><i class="fas fa-clock"></i> Slot Configuration</h3>
+          <div class="slot-config" id="slotConfig"></div>
+          <button onclick="saveSlotConfig()" class="btn-primary"><i class="fas fa-save"></i> Save Slots</button>
+        </div>
+        <div class="settings-section">
+          <h3><i class="fas fa-money-bill-wave"></i> Service Pricing</h3>
+          <div class="pricing-config" id="pricingConfig"></div>
+          <button onclick="savePricing()" class="btn-primary"><i class="fas fa-save"></i> Save Pricing</button>
+        </div>
+        <div class="settings-section">
+          <h3><i class="fas fa-key"></i> 🔐 Access Key Generator</h3>
+          <div class="key-generator-box">
+            <div class="form-row">
+              <select id="keyRole" class="clean-input">
+                <option value="RECEPTIONIST">Receptionist (Cancel Request Only)</option>
+                <option value="DOCTOR">Doctor (Cancel Request Only)</option>
+                <option value="MANAGER">Manager (Cancel + Delete)</option>
+                <option value="ADMIN">Admin (Cancel + Delete)</option>
+              </select>
+              <select id="keyExpiry" class="clean-input">
+                <option value="1">1 Day Validity</option>
+                <option value="3">3 Days Validity</option>
+                <option value="7" selected>7 Days Validity</option>
+                <option value="30">30 Days Validity</option>
+              </select>
+              <button onclick="generateAccessKey()" class="btn-primary"><i class="fas fa-key"></i> Generate Key</button>
+            </div>
+            <div id="generatedKeyDisplay" class="key-display" style="display:none;">
+              <div class="key-card">
+                <div class="key-value"><code id="newAccessKey">KEY-XXXX-XXXX-XXXX</code><button onclick="copyAccessKey()" class="btn-copy"><i class="fas fa-copy"></i> Copy</button></div>
+                <div class="key-info"><span id="keyRoleDisplay"></span> | Expires: <span id="keyExpiryDisplay"></span></div>
+              </div>
+            </div>
+            <div class="active-keys-list">
+              <h4><i class="fas fa-list"></i> Active Keys</h4>
+              <div id="keysTable"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading keys...</div></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- BACKUP PAGE -->
+    <!-- ===== BACKUP PAGE ===== -->
     <div id="backupPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-database"></i> Backup & Restore</h2></div>
       <div class="backup-card">
@@ -252,7 +408,7 @@
       </div>
     </div>
 
-    <!-- REPORTS PAGE -->
+    <!-- ===== REPORTS PAGE ===== -->
     <div id="reportsPage" class="page-content">
       <div class="page-header"><h2><i class="fas fa-chart-line"></i> Reports & Analytics</h2>
         <div class="report-filters">
@@ -269,15 +425,14 @@
   </main>
 </div>
 
-<!-- ============================================
-     ADD DOCTOR MODAL
-============================================ -->
+<!-- ============================================ -->
+<!-- SECTION 8: MODALS (ADD/EDIT FORMS)           -->
+<!-- ============================================ -->
+
+<!-- Add Doctor Modal -->
 <div id="addDoctorModal" class="modal">
   <div class="modal-card">
-    <div class="modal-header-custom">
-      <div class="modal-title-custom"><i class="fas fa-user-md"></i><h3>Add New Doctor</h3></div>
-      <button class="modal-close" onclick="closeAddDoctorModal()">&times;</button>
-    </div>
+    <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-user-md"></i><h3>Add New Doctor</h3></div><button class="modal-close" onclick="closeAddDoctorModal()">&times;</button></div>
     <div class="modal-body-custom">
       <div class="form-group-custom"><label>Full Name</label><input type="text" id="newDoctorName" class="clean-input"></div>
       <div class="form-group-custom"><label>Email</label><input type="email" id="newDoctorEmail" class="clean-input"></div>
@@ -286,16 +441,11 @@
       <div class="form-group-custom"><label>Phone</label><input type="text" id="newDoctorPhone" class="clean-input"></div>
       <div class="form-group-custom"><label>Schedule</label><input type="text" id="newDoctorSchedule" class="clean-input"></div>
     </div>
-    <div class="modal-footer-custom">
-      <button class="btn-secondary-custom" onclick="closeAddDoctorModal()">Cancel</button>
-      <button class="btn-primary-custom" onclick="addDoctor()">Add Doctor</button>
-    </div>
+    <div class="modal-footer-custom"><button class="btn-secondary-custom" onclick="closeAddDoctorModal()">Cancel</button><button class="btn-primary-custom" onclick="addDoctor()">Add Doctor</button></div>
   </div>
 </div>
 
-<!-- ============================================
-     EDIT DOCTOR MODAL
-============================================ -->
+<!-- Edit Doctor Modal -->
 <div id="editDoctorModal" class="modal">
   <div class="modal-card">
     <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-edit"></i><h3>Edit Doctor</h3></div><button class="modal-close" onclick="closeEditDoctorModal()">&times;</button></div>
@@ -312,9 +462,7 @@
   </div>
 </div>
 
-<!-- ============================================
-     ADD SERVICE MODAL
-============================================ -->
+<!-- Add Service Modal -->
 <div id="addServiceModal" class="modal">
   <div class="modal-card">
     <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-stethoscope"></i><h3>Add New Service</h3></div><button class="modal-close" onclick="closeAddServiceModal()">&times;</button></div>
@@ -329,9 +477,7 @@
   </div>
 </div>
 
-<!-- ============================================
-     EDIT SERVICE MODAL
-============================================ -->
+<!-- Edit Service Modal -->
 <div id="editServiceModal" class="modal">
   <div class="modal-card">
     <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-edit"></i><h3>Edit Service</h3></div><button class="modal-close" onclick="closeEditServiceModal()">&times;</button></div>
@@ -347,9 +493,7 @@
   </div>
 </div>
 
-<!-- ============================================
-     ADD USER MODAL
-============================================ -->
+<!-- Add User Modal -->
 <div id="addUserModal" class="modal">
   <div class="modal-card">
     <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-user-plus"></i><h3>Add New User</h3></div><button class="modal-close" onclick="closeAddUserModal()">&times;</button></div>
@@ -363,9 +507,7 @@
   </div>
 </div>
 
-<!-- ============================================
-     EDIT USER MODAL
-============================================ -->
+<!-- Edit User Modal -->
 <div id="editUserModal" class="modal">
   <div class="modal-card">
     <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-user-edit"></i><h3>Edit User</h3></div><button class="modal-close" onclick="closeEditUserModal()">&times;</button></div>
@@ -380,11 +522,23 @@
   </div>
 </div>
 
-<!-- Page Transition Overlay -->
-<div class="page-transition-overlay">
-  <div class="loader"></div>
+<!-- View Appointment Modal -->
+<div id="viewAppointmentModal" class="modal">
+  <div class="modal-card modal-lg">
+    <div class="modal-header-custom"><div class="modal-title-custom"><i class="fas fa-file-medical"></i><h3>Appointment Details</h3></div><button class="modal-close" onclick="closeViewAppointmentModal()">&times;</button></div>
+    <div class="modal-body-custom" id="appointmentDetails"></div>
+    <div class="modal-footer-custom"><button class="btn-secondary-custom" onclick="closeViewAppointmentModal()">Close</button></div>
+  </div>
 </div>
 
+<!-- ============================================ -->
+<!-- SECTION 9: PAGE TRANSITION OVERLAY           -->
+<!-- ============================================ -->
+<div class="page-transition-overlay"><div class="loader"></div></div>
+
+<!-- ============================================ -->
+<!-- SECTION 10: SCRIPTS                          -->
+<!-- ============================================ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="admin-script.js"></script>
 </body>

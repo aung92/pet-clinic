@@ -1,90 +1,462 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- ============================================ -->
+  <!-- SECTION 1: META TAGS & PAGE TITLE             -->
+  <!-- ============================================ -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doctor Login | VET FOR PET</title>
+  <title>Doctor Login | VET FOR PET CLINIC</title>
+  
+  <!-- ============================================ -->
+  <!-- SECTION 2: EXTERNAL STYLESHEETS & FONTS      -->
+  <!-- ============================================ -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  
+  <!-- ============================================ -->
+  <!-- SECTION 3: LOGIN PAGE STYLES                 -->
+  <!-- ============================================ -->
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f172a, #1e293b); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .login-container { width: 100%; max-width: 450px; padding: 20px; }
-    .login-card { background: white; border-radius: 32px; padding: 40px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    .login-header { text-align: center; margin-bottom: 32px; }
-    .logo-icon { width: 70px; height: 70px; background: linear-gradient(135deg, #f97316, #ea580c); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 32px; color: white; }
-    .login-header h1 { font-size: 1.5rem; color: #0f172a; }
-    .login-header p { color: #64748b; font-size: 0.85rem; }
-    .form-group { margin-bottom: 20px; }
-    .input-with-icon { position: relative; }
-    .input-with-icon i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-    .input-with-icon input { width: 100%; padding: 14px 16px 14px 45px; border: 2px solid #e2e8f0; border-radius: 16px; font-size: 1rem; transition: all 0.2s; }
-    .input-with-icon input:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }
-    .login-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 16px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; }
-    .login-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(249,115,22,0.3); }
-    .error-message { background: #fef2f2; color: #ef4444; padding: 12px; border-radius: 12px; margin-bottom: 20px; display: none; font-size: 0.85rem; }
-    .demo-credentials { margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: center; }
-    .demo-badge { display: inline-flex; gap: 16px; background: #f1f5f9; padding: 8px 16px; border-radius: 50px; font-size: 0.7rem; font-family: monospace; }
-    .back-link { text-align: center; margin-top: 20px; }
-    .back-link a { color: #94a3b8; text-decoration: none; font-size: 0.8rem; }
-    .back-link a:hover { color: #f97316; }
+    /* রিসেট স্টাইল */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    /* বডি স্টাইল - গ্রেডিয়েন্ট ব্যাকগ্রাউন্ড */
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* লগইন কন্টেইনার */
+    .login-container {
+      width: 100%;
+      max-width: 450px;
+      padding: 20px;
+    }
+    
+    /* লগইন কার্ড */
+    .login-card {
+      background: white;
+      border-radius: 32px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.3s ease;
+    }
+    
+    /* ফেইড ইন অ্যানিমেশন */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* লগইন হেডার */
+    .login-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    
+    /* লোগো আইকন */
+    .logo-icon {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+      color: white;
+    }
+    
+    .login-header h1 {
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+    
+    .login-header p {
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+    
+    /* ফর্ম গ্রুপ */
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    /* ইনপুট উইথ আইকন */
+    .input-with-icon {
+      position: relative;
+    }
+    
+    .input-with-icon i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+    }
+    
+    .input-with-icon input {
+      width: 100%;
+      padding: 14px 16px 14px 45px;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+    
+    .input-with-icon input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    }
+    
+    /* লগইন বাটন */
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(249, 115, 22, 0.3);
+    }
+    
+    /* এরর মেসেজ স্টাইল */
+    .error-message {
+      background: #fef2f2;
+      color: #ef4444;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: none;
+      font-size: 0.85rem;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* ডেমো ক্রেডেনশিয়াল সেকশন */
+    .demo-credentials {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    
+    .demo-badge {
+      display: inline-flex;
+      gap: 16px;
+      background: #f1f5f9;
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-size: 0.7rem;
+      font-family: monospace;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    /* ব্যাক লিংক */
+    .back-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+    
+    .back-link a {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+    
+    .back-link a:hover {
+      color: #f97316;
+    }
+    
+    /* রেসপনসিভ ডিজাইন */
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 30px 20px;
+      }
+      
+      .demo-badge {
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
   </style>
 </head>
 <body>
+
+<!-- ============================================ -->
+<!-- SECTION 4: LOGIN CONTAINER                   -->
+<!-- ============================================ -->
 <div class="login-container">
   <div class="login-card">
+    
+    <!-- ===== লগইন হেডার ===== -->
     <div class="login-header">
-      <div class="logo-icon"><i class="fas fa-user-md"></i></div>
+      <div class="logo-icon">
+        <i class="fas fa-user-md"></i>
+      </div>
       <h1>Doctor Portal</h1>
       <p>VET FOR PET CLINIC</p>
     </div>
-    <div id="errorMessage" class="error-message"><i class="fas fa-exclamation-circle"></i> Invalid credentials</div>
-    <form id="loginForm">
-      <div class="form-group">
-        <div class="input-with-icon"><i class="fas fa-envelope"></i><input type="text" id="username" placeholder="doctor@vetforpet.com" autocomplete="off"></div>
-      </div>
-      <div class="form-group">
-        <div class="input-with-icon"><i class="fas fa-lock"></i><input type="password" id="password" placeholder="Enter your password"></div>
-      </div>
-      <button type="submit" class="login-btn"><i class="fas fa-sign-in-alt"></i> Login</button>
-    </form>
-    <div class="demo-credentials">
-      <p>Demo Access</p>
-      <div class="demo-badge"><span><strong>Email:</strong> doctor@vetforpet.com</span><span><strong>Password:</strong> doctor123</span></div>
+    
+    <!-- ===== এরর মেসেজ ===== -->
+    <div id="errorMessage" class="error-message">
+      <i class="fas fa-exclamation-circle"></i>
+      <span id="errorText">Invalid credentials</span>
     </div>
-    <div class="back-link"><a href="../index.html"><i class="fas fa-arrow-left"></i> Back to Patient Portal</a></div>
+    
+    <!-- ===== লগইন ফর্ম ===== -->
+    <form id="loginForm">
+      <!-- ইউজারনেম/ইমেইল ফিল্ড -->
+      <div class="form-group">
+        <div class="input-with-icon">
+          <i class="fas fa-envelope"></i>
+          <input 
+            type="text" 
+            id="username" 
+            placeholder="Email or Username" 
+            autocomplete="off"
+            required
+          >
+        </div>
+      </div>
+      
+      <!-- পাসওয়ার্ড ফিল্ড -->
+      <div class="form-group">
+        <div class="input-with-icon">
+          <i class="fas fa-lock"></i>
+          <input 
+            type="password" 
+            id="password" 
+            placeholder="Enter your password"
+            required
+          >
+        </div>
+      </div>
+      
+      <!-- লগইন বাটন -->
+      <button type="submit" class="login-btn">
+        <i class="fas fa-sign-in-alt"></i> Login
+      </button>
+    </form>
+    
+    <!-- ===== ডেমো ক্রেডেনশিয়াল ===== -->
+    <div class="demo-credentials">
+      <p style="margin-bottom: 10px;">Demo Access</p>
+      <div class="demo-badge">
+        <span><strong>Email:</strong> doctor@vetforpet.com</span>
+        <span><strong>Password:</strong> doctor123</span>
+      </div>
+      <p style="font-size: 0.7rem; margin-top: 12px; color: #94a3b8;">
+        <i class="fas fa-info-circle"></i> Use the demo credentials above to login
+      </p>
+    </div>
+    
+    <!-- ===== ব্যাক লিংক ===== -->
+    <div class="back-link">
+      <a href="../index.html">
+        <i class="fas fa-arrow-left"></i> Back to Home
+      </a>
+    </div>
+    
   </div>
 </div>
+
+<!-- ============================================ -->
+<!-- SECTION 5: LOGIN SCRIPT                      -->
+<!-- ============================================ -->
 <script>
-  const DOCTOR_CREDENTIALS = { 
-    email: "doctor@vetforpet.com", 
-    password: "doctor123", 
-    name: "Dr. Mitesh Tripura", 
-    role: "Senior Veterinarian", 
-    specialization: "Cardiology & Surgery",
-    phone: "01406779238",
-    schedule: "Sat-Wed 9AM-9PM"
-  };
+  // ============================================
+  // ডাক্তার ক্রেডেনশিয়াল (স্ট্যাটিক ডাটাবেস)
+  // একাধিক ডাক্তার যোগ করার সুযোগ রাখা হয়েছে
+  // ============================================
   
+  // ডাক্তারদের তালিকা (একাধিক ডাক্তার সাপোর্ট)
+  const DOCTORS_LIST = [
+    {
+      id: 1,
+      email: "doctor@vetforpet.com",
+      password: "doctor123",
+      name: "Dr. Mitesh Tripura",
+      role: "Senior Veterinarian",
+      specialization: "Cardiology & Surgery",
+      phone: "01406779238",
+      schedule: "Sat-Wed 9AM-9PM",
+      joined: "2024"
+    },
+    {
+      id: 2,
+      email: "dr.sarah@vetforpet.com",
+      password: "sarah123",
+      name: "Dr. Sarah Khan",
+      role: "Veterinarian",
+      specialization: "Pet Dentistry & Orthopedics",
+      phone: "01712345678",
+      schedule: "Sun-Thu 10AM-6PM",
+      joined: "2024"
+    },
+    {
+      id: 3,
+      email: "dr.rahim@vetforpet.com",
+      password: "rahim123",
+      name: "Dr. Rahim Uddin",
+      role: "Junior Veterinarian",
+      specialization: "General Medicine",
+      phone: "01987654321",
+      schedule: "Sat-Wed 9AM-5PM",
+      joined: "2025"
+    }
+  ];
+  
+  // ============================================
+  // URL প্যারামিটার থেকে এরর মেসেজ দেখানো
+  // ============================================
+  (function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const errorDiv = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+    
+    if (error === 'invalid_credentials') {
+      errorText.innerText = 'Invalid email or password! Please try again.';
+      errorDiv.style.display = 'flex';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 4000);
+    } else if (error === 'session_expired') {
+      errorText.innerText = 'Your session has expired. Please login again.';
+      errorDiv.style.display = 'flex';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 4000);
+    } else if (error === 'access_denied') {
+      errorText.innerText = 'Access denied. Please contact administrator.';
+      errorDiv.style.display = 'flex';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 4000);
+    }
+  })();
+  
+  // ============================================
+  // লগইন ফর্ম সাবমিট হ্যান্ডলার
+  // ============================================
   document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    
+    // ইনপুট ফিল্ড থেকে মান নেওয়া
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
     
-    if (username === DOCTOR_CREDENTIALS.email && password === DOCTOR_CREDENTIALS.password) {
-      sessionStorage.setItem('doctor_logged_in', 'true');
-      sessionStorage.setItem('doctor_name', DOCTOR_CREDENTIALS.name);
-      sessionStorage.setItem('doctor_role', DOCTOR_CREDENTIALS.role);
-      sessionStorage.setItem('doctor_email', DOCTOR_CREDENTIALS.email);
-      sessionStorage.setItem('doctor_specialization', DOCTOR_CREDENTIALS.specialization);
-      sessionStorage.setItem('doctor_phone', DOCTOR_CREDENTIALS.phone);
-      sessionStorage.setItem('doctor_schedule', DOCTOR_CREDENTIALS.schedule);
-      window.location.href = 'doctor-dashboard.html';
-    } else {
+    // ফাঁকা চেক
+    if (!username || !password) {
       const errorDiv = document.getElementById('errorMessage');
-      errorDiv.style.display = 'block';
-      setTimeout(() => { errorDiv.style.display = 'none'; }, 3000);
+      const errorText = document.getElementById('errorText');
+      errorText.innerText = 'Please enter both email and password!';
+      errorDiv.style.display = 'flex';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 3000);
+      return;
+    }
+    
+    // ডাক্তার খোঁজা (ইমেইল দিয়ে)
+    let doctor = DOCTORS_LIST.find(doc => doc.email === username);
+    
+    // ইমেইল না পাওয়া গেলে ইউজারনেম দিয়ে চেক (ঐচ্ছিক)
+    if (!doctor) {
+      doctor = DOCTORS_LIST.find(doc => doc.name.toLowerCase() === username.toLowerCase());
+    }
+    
+    // পাসওয়ার্ড চেক
+    if (doctor && doctor.password === password) {
+      
+      // ============================================
+      // লগইন সফল - ডাক্তার তথ্য সংরক্ষণ
+      // ============================================
+      
+      // সেশন স্টোরেজে ডাক্তারের তথ্য সংরক্ষণ
+      sessionStorage.setItem('doctor_logged_in', 'true');
+      sessionStorage.setItem('doctor_id', doctor.id);
+      sessionStorage.setItem('doctor_name', doctor.name);
+      sessionStorage.setItem('doctor_role', doctor.role);
+      sessionStorage.setItem('doctor_email', doctor.email);
+      sessionStorage.setItem('doctor_specialization', doctor.specialization);
+      sessionStorage.setItem('doctor_phone', doctor.phone);
+      sessionStorage.setItem('doctor_schedule', doctor.schedule);
+      sessionStorage.setItem('doctor_joined', doctor.joined);
+      
+      // টাইমস্ট্যাম্প সংরক্ষণ
+      sessionStorage.setItem('doctor_login_time', new Date().toISOString());
+      
+      // কনসোল লগ (ডিবাগিং এর জন্য)
+      console.log('✅ Doctor logged in successfully:', doctor.name);
+      console.log('👤 Role:', doctor.role);
+      console.log('📧 Email:', doctor.email);
+      
+      // ড্যাশবোর্ডে রিডাইরেক্ট
+      window.location.href = 'doctor-dashboard.html';
+      
+    } else {
+      // ============================================
+      // লগইন ব্যর্থ - এরর মেসেজ দেখান
+      // ============================================
+      const errorDiv = document.getElementById('errorMessage');
+      const errorText = document.getElementById('errorText');
+      errorText.innerText = 'Invalid email or password! Please try again.';
+      errorDiv.style.display = 'flex';
+      
+      // ৩ সেকেন্ড পরে এরর মেসেজ হাইড করুন
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 3000);
+      
+      // ইনপুট ফিল্ড ক্লিয়ার
+      document.getElementById('password').value = '';
+      
+      console.warn('❌ Login failed for:', username);
+    }
+  });
+  
+  // ============================================
+  // এন্টার কী প্রেস করলে সাবমিট
+  // ============================================
+  document.getElementById('password').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+    }
+  });
+  
+  document.getElementById('username').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('password').focus();
     }
   });
 </script>

@@ -3,8 +3,14 @@
    Modern Design | Role Based Access
    ============================================ */
 
+/* --------------------------------------------
+   RESET & BASE STYLES
+--------------------------------------------- */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* --------------------------------------------
+   CSS VARIABLES / DESIGN TOKENS
+--------------------------------------------- */
 :root {
   --primary: #f97316;
   --primary-dark: #ea580c;
@@ -23,102 +29,184 @@
   --sidebar-width: 280px;
 }
 
+/* --------------------------------------------
+   GLOBAL BODY & CONTAINER
+--------------------------------------------- */
 body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var(--gray-900); overflow-x: hidden; }
 
 .dashboard-container { display: flex; min-height: 100vh; }
 
 /* ============================================
    SIDEBAR STYLES
-============================================ */
+   ============================================ */
+
+/* Sidebar Container */
 .sidebar { width: var(--sidebar-width); background: linear-gradient(180deg, var(--gray-900) 0%, #1e293b 100%); color: white; position: fixed; height: 100vh; overflow-y: auto; transition: all 0.3s; z-index: 100; }
+
+/* Sidebar Header Section */
 .sidebar-header { padding: 30px 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+/* Logo / Icon Container */
 .logo-icon { width: 60px; height: 60px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 28px; }
+
 .sidebar-header h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 5px; }
+
+/* Role Badge in Sidebar */
 .role-badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; }
+
+/* Navigation Menu */
 .sidebar-nav { padding: 20px 0; }
+
+/* Individual Nav Items */
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: #cbd5e1; text-decoration: none; transition: all 0.3s; cursor: pointer; }
+
+/* Disabled Nav State */
 .nav-item.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
 .nav-item i { width: 24px; font-size: 1.2rem; }
+
+/* Notification Badge */
 .nav-item .badge { background: var(--danger); color: white; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; margin-left: auto; }
+
+/* Hover Effects */
 .nav-item:hover:not(.disabled) { background: rgba(255,255,255,0.1); color: white; }
+
+/* Active Nav Item */
 .nav-item.active { background: linear-gradient(90deg, rgba(249,115,22,0.2), transparent); color: var(--primary); border-left: 3px solid var(--primary); }
+
+/* Sidebar Footer Section */
 .sidebar-footer { position: absolute; bottom: 0; width: 100%; padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+
+/* Admin Info Card in Sidebar */
 .admin-info { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; }
+
 .admin-avatar { width: 40px; height: 40px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
 .admin-info strong { display: block; font-size: 0.9rem; }
 .admin-info small { font-size: 0.7rem; opacity: 0.7; }
+
+/* Logout Button */
 .logout-btn { width: 100%; padding: 10px; background: rgba(239,68,68,0.2); color: #f87171; border: none; border-radius: 10px; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
 .logout-btn:hover { background: var(--danger); color: white; }
 
 /* ============================================
-   MAIN CONTENT
-============================================ */
+   MAIN CONTENT AREA
+   ============================================ */
+
+/* Main Dashboard Container */
 .main-dashboard { flex: 1; margin-left: var(--sidebar-width); min-height: 100vh; }
+
+/* Sticky Header */
 .dashboard-header { background: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--gray-200); position: sticky; top: 0; z-index: 50; }
+
+/* Header Left Side - Title */
 .header-left h1 { font-size: 1.5rem; font-weight: 700; color: var(--gray-900); }
 .header-left p { color: var(--gray-700); font-size: 0.85rem; }
+
+/* Header Right Side - Date & Actions */
 .header-right { display: flex; align-items: center; gap: 20px; }
+
+/* Date & Time Display Box */
 .date-time-box { display: flex; gap: 15px; background: var(--gray-100); padding: 8px 16px; border-radius: 50px; font-size: 0.85rem; }
+
+/* Sync Status Indicator */
 .sync-status { font-size: 0.7rem; color: var(--success-dark); background: #f0fdf4; padding: 4px 10px; border-radius: 50px; transition: opacity 0.3s; }
+
+/* Refresh Button */
 .refresh-btn { padding: 8px; cursor: pointer; border-radius: 50%; transition: all 0.3s; }
 .refresh-btn:hover { background: var(--gray-100); transform: rotate(180deg); }
 
 /* ============================================
    PAGE CONTENT
-============================================ */
+   ============================================ */
+
+/* Page Content Base */
 .page-content { display: none; padding: 30px; animation: fadeIn 0.3s ease; }
 .page-content.active { display: block; }
+
+/* Fade In Animation */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Page Header Section */
 .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 25px; }
 .page-header h2 { font-size: 1.4rem; font-weight: 700; color: var(--gray-900); }
 
 /* ============================================
    STATS CARDS
-============================================ */
+   ============================================ */
+
+/* Stats Grid Layout */
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+
+/* Individual Stat Card */
 .stat-card { background: white; border-radius: 20px; padding: 20px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.3s; }
+
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+
+/* Color Variants for Stat Cards */
 .stat-card.primary .stat-icon { background: rgba(249,115,22,0.1); color: var(--primary); }
 .stat-card.success .stat-icon { background: rgba(34,197,94,0.1); color: var(--success); }
 .stat-card.dark-success .stat-icon { background: rgba(21,128,61,0.1); color: var(--success-dark); }
 .stat-card.info .stat-icon { background: rgba(14,165,233,0.1); color: var(--info); }
 .stat-card.warning .stat-icon { background: rgba(245,158,11,0.1); color: var(--warning); }
 .stat-card.pending .stat-icon { background: rgba(245,158,11,0.1); color: var(--warning); }
+
+/* Stat Icon Container */
 .stat-icon { width: 55px; height: 55px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+
+/* Stat Text Information */
 .stat-info h3 { font-size: 1.8rem; font-weight: 700; }
 .stat-info p { color: var(--gray-700); font-size: 0.85rem; }
 
 /* ============================================
    QUICK ACTIONS
-============================================ */
+   ============================================ */
+
 .quick-actions { background: white; border-radius: 20px; padding: 20px; margin-bottom: 30px; }
 .quick-actions h3 { margin-bottom: 15px; font-size: 1.1rem; }
+
+/* Action Buttons Container */
 .action-buttons { display: flex; gap: 15px; flex-wrap: wrap; }
 .action-buttons button { padding: 10px 20px; border: none; background: var(--gray-100); border-radius: 12px; cursor: pointer; font-weight: 500; transition: all 0.3s; }
 .action-buttons button:hover { background: var(--primary); color: white; transform: translateY(-2px); }
 
 /* ============================================
-   ROW 2 COLUMNS
-============================================ */
+   TWO COLUMN LAYOUT
+   ============================================ */
+
 .row-2cols { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+
+/* Recent Section & Small Stats Section */
 .recent-section, .stats-section-small { background: white; border-radius: 20px; padding: 20px; }
+
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 
 /* ============================================
-   LISTS
-============================================ */
+   LIST STYLES
+   ============================================ */
+
+/* Common List Containers */
 .appointments-list, .doctors-list, .services-list, .users-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* History/Card Items */
 .history-item { background: white; border-radius: 16px; padding: 16px 20px; border-left: 4px solid var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.3s; cursor: pointer; }
+
 .history-item:hover { transform: translateX(5px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+/* Token Badge */
 .token { background: var(--primary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-family: monospace; }
+
+/* Status Badge Variants */
 .status { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
 .status.completed { background: #dcfce7; color: var(--success-dark); }
 .status.confirmed { background: #fef3c7; color: #d97706; }
 .status.cancelled { background: #fee2e2; color: var(--danger); }
 
 /* ============================================
-   MINI STATS
-============================================ */
+   MINI STATS SECTION
+   ============================================ */
+
 .mini-stats { display: flex; flex-direction: column; gap: 15px; }
 .mini-stat { background: var(--gray-100); padding: 12px; border-radius: 12px; text-align: center; }
 .mini-label { display: block; font-size: 0.7rem; color: var(--gray-700); margin-bottom: 5px; }
@@ -127,45 +215,66 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 
 /* ============================================
    FILTER BAR
-============================================ */
+   ============================================ */
+
 .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; }
 .filter-bar input, .filter-bar select { padding: 10px 16px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 0.9rem; font-family: inherit; }
 .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: var(--primary); }
 
 /* ============================================
-   BUTTONS
-============================================ */
+   BUTTON STYLES
+   ============================================ */
+
+/* Base Button Classes */
 .btn-primary, .btn-secondary, .btn-export, .btn-print, .btn-primary-custom, .btn-secondary-custom, .btn-danger { padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+
+/* Primary Button */
 .btn-primary, .btn-primary-custom { background: var(--primary); color: white; }
 .btn-primary:hover, .btn-primary-custom:hover { background: var(--primary-dark); transform: translateY(-2px); }
+
+/* Secondary Button */
 .btn-secondary, .btn-secondary-custom { background: var(--gray-200); color: var(--gray-700); }
 .btn-secondary:hover, .btn-secondary-custom:hover { background: var(--gray-300); }
+
+/* Export Button */
 .btn-export { background: var(--success-dark); color: white; }
 .btn-export:hover { background: #0f5b2e; }
+
+/* Print Button */
 .btn-print { background: var(--gray-700); color: white; }
 .btn-print:hover { background: var(--gray-800); }
+
+/* Danger Button */
 .btn-danger { background: var(--danger); color: white; }
 .btn-danger:hover { background: var(--danger-dark); }
 
 /* ============================================
-   LOGOUT MODAL - MODERN DESIGN
-============================================ */
+   MODAL DIALOG - MODERN DESIGN
+   ============================================ */
+
+/* Modal Overlay */
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); align-items: center; justify-content: center; z-index: 1000; }
 .modal.show { display: flex !important; animation: modalFadeIn 0.2s ease; }
+
 @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
+/* Modal Card Container */
 .modal-card { background: white; border-radius: 28px; width: 90%; max-width: 400px; max-height: 85vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: modalSlideUp 0.3s ease; }
+
 @keyframes modalSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+/* Modal Icon Variants */
 .modal-icon { width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: -35px auto 20px; font-size: 32px; color: white; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); }
 .modal-icon.warning { background: linear-gradient(135deg, #f97316, #ea580c); }
 .modal-icon.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .modal-icon.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
 
+/* Modal Content */
 .modal-content-custom { padding: 0 24px 24px 24px; text-align: center; }
 .modal-title-custom { font-size: 1.4rem; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
 .modal-message { font-size: 0.9rem; color: #475569; margin-bottom: 24px; line-height: 1.5; }
 
+/* Modal Buttons */
 .modal-buttons-custom { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
 .btn-cancel, .btn-logout { padding: 10px 24px; border-radius: 50px; border: none; font-weight: 500; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; }
 .btn-cancel { background: #f1f5f9; color: #475569; }
@@ -173,9 +282,11 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 .btn-logout { background: #ef4444; color: white; }
 .btn-logout:hover { background: #dc2626; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
 
+/* Modal Close Button */
 .modal-close { background: transparent; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; color: #64748b; position: absolute; top: 16px; right: 16px; }
 .modal-close:hover { background: #fee2e2; color: #ef4444; }
 
+/* Modal Header Variation */
 .modal-header-custom { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--gray-200); background: #f8fafc; border-radius: 28px 28px 0 0; }
 .modal-title-custom { display: flex; align-items: center; gap: 12px; }
 .modal-title-custom i { font-size: 1.4rem; color: var(--primary); }
@@ -183,36 +294,44 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 .modal-footer-custom { padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc; border-radius: 0 0 28px 28px; }
 
 /* ============================================
-   FORM STYLES
-============================================ */
+   FORM ELEMENTS
+   ============================================ */
+
 .form-group-custom { margin-bottom: 20px; }
 .form-group-custom label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 8px; }
+
+/* Clean Input Fields */
 .clean-input, .clean-textarea { border: 2px solid #1e293b !important; border-radius: 12px !important; padding: 12px 14px !important; font-size: 0.9rem !important; background: white !important; width: 100% !important; }
 .clean-input:focus, .clean-textarea:focus { border-color: var(--primary) !important; outline: none !important; box-shadow: 0 0 0 3px rgba(249,115,22,0.1) !important; }
 
 /* ============================================
-   SETTINGS
-============================================ */
+   SETTINGS PANEL
+   ============================================ */
+
 .settings-card { background: white; border-radius: 24px; padding: 24px; }
 .settings-section { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--gray-200); }
 .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .settings-section h3 { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--primary); display: inline-block; }
 .settings-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
+
+/* Slot & Pricing Configuration */
 .slot-config, .pricing-config { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
 .slot-item { background: var(--gray-100); padding: 12px; border-radius: 12px; }
 .slot-item label { font-weight: 600; display: block; margin-bottom: 8px; }
 .slot-item input { width: 80px; padding: 8px; border: 1px solid var(--gray-300); border-radius: 8px; text-align: center; }
 
 /* ============================================
-   BACKUP CARD
-============================================ */
+   BACKUP SECTION
+   ============================================ */
+
 .backup-card { background: white; border-radius: 24px; padding: 24px; }
 .backup-actions { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; }
 .backup-info { background: var(--gray-100); padding: 15px; border-radius: 16px; }
 
 /* ============================================
-   PERMISSIONS
-============================================ */
+   PERMISSIONS MANAGEMENT
+   ============================================ */
+
 .permissions-list { background: white; border-radius: 20px; padding: 20px; }
 .permission-group { margin-bottom: 25px; border-bottom: 1px solid var(--gray-200); padding-bottom: 15px; }
 .permission-group h4 { margin-bottom: 15px; color: var(--primary); }
@@ -221,22 +340,25 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 
 /* ============================================
    PAGINATION
-============================================ */
+   ============================================ */
+
 .pagination { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
 .pagination button { padding: 8px 16px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; cursor: pointer; }
 .pagination button.active { background: var(--primary); color: white; border-color: var(--primary); }
 
 /* ============================================
    TOAST NOTIFICATIONS
-============================================ */
+   ============================================ */
+
 .toast-notification { position: fixed; bottom: 30px; right: 30px; padding: 12px 24px; border-radius: 12px; color: white; font-weight: 500; z-index: 2000; transform: translateX(400px); transition: transform 0.3s ease; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
 .toast-notification.show { transform: translateX(0); }
 .toast-notification.success { background: #15803d; }
 .toast-notification.error { background: #dc2626; }
 
 /* ============================================
-   REPORTS
-============================================ */
+   REPORTS SECTION
+   ============================================ */
+
 .report-container { background: white; border-radius: 20px; padding: 20px; }
 .report-summary h3 { margin-bottom: 15px; color: var(--primary); }
 .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -244,9 +366,13 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 .report-table th { background: var(--gray-100); font-weight: 600; }
 
 /* ============================================
-   RESPONSIVE
-============================================ */
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Tablet Breakpoint */
 @media (max-width: 1024px) { .row-2cols { grid-template-columns: 1fr; } }
+
+/* Mobile Breakpoint */
 @media (max-width: 768px) { 
   .sidebar { width: 70px; } 
   .sidebar-header h2, .sidebar-header .role-badge, .nav-item span, .sidebar-footer .admin-info, .logout-btn span { display: none; } 
@@ -258,6 +384,8 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
   .action-buttons { flex-direction: column; } 
   .action-buttons button { width: 100%; } 
 }
+
+/* Small Mobile Breakpoint */
 @media (max-width: 480px) { .stats-row { grid-template-columns: 1fr; } }
 
 /* ============================================
@@ -413,7 +541,7 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Button Transition */
+/* Button Transition Effects */
 .btn-primary, .btn-secondary, .btn-export, .btn-print, 
 .btn-primary-custom, .btn-secondary-custom, .btn-danger {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -557,4 +685,241 @@ body { font-family: 'Inter', sans-serif; background: var(--gray-100); color: var
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   ACCESS KEY GENERATOR STYLES
+   ============================================ */
+
+/* Key Generator Box */
+.key-generator-box {
+  background: var(--gray-100);
+  padding: 24px;
+  border-radius: 24px;
+  margin-top: 15px;
+}
+
+/* Form Row inside Key Generator */
+.key-generator-box .form-row {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.key-generator-box .form-row select {
+  flex: 1;
+  min-width: 150px;
+  padding: 12px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  background: white;
+  font-size: 0.9rem;
+}
+
+/* Key Display Card */
+.key-display {
+  margin-top: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.key-card {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border-radius: 20px;
+  padding: 20px;
+  color: white;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+}
+
+.key-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.key-value code {
+  font-size: 1.1rem;
+  background: rgba(255,255,255,0.15);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  word-break: break-all;
+}
+
+/* Copy Button */
+.btn-copy {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-copy:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.key-info {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Active Keys List */
+.active-keys-list {
+  margin-top: 30px;
+}
+
+.active-keys-list h4 {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary);
+  display: inline-block;
+  color: var(--gray-900);
+}
+
+/* Keys Table */
+.keys-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.keys-table th,
+.keys-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.keys-table th {
+  background: var(--gray-100);
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.keys-table td code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  background: var(--gray-100);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+/* Role Badges for Access Keys */
+.role-badge-receptionist {
+  background: #8b5cf6;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.role-badge-doctor {
+  background: #3b82f6;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.role-badge-manager {
+  background: #f59e0b;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.role-badge-admin {
+  background: #ef4444;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* Small Danger Button for Key Actions */
+.btn-danger-small {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-danger-small:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* Empty State for Keys List */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  background: white;
+  border-radius: 16px;
+  color: var(--gray-700);
+}
+
+.empty-state i {
+  font-size: 40px;
+  color: var(--gray-300);
+  margin-bottom: 12px;
+}
+
+/* Key Generator Responsive Styles */
+@media (max-width: 768px) {
+  .key-generator-box .form-row {
+    flex-direction: column;
+  }
+  
+  .key-generator-box .form-row select {
+    width: 100%;
+  }
+  
+  .key-value {
+    flex-direction: column;
+  }
+  
+  .key-value code {
+    font-size: 0.9rem;
+    word-break: break-all;
+    text-align: center;
+  }
+  
+  .keys-table {
+    display: block;
+    overflow-x: auto;
+  }
 }

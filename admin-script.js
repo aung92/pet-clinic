@@ -1,7 +1,8 @@
 // ============================================
 // ADMIN DASHBOARD - COMPLETE SCRIPT
 // Role Based Access | Full Permissions Control
-// Version: 2.1 | Fixed Delete Issue | Last Updated: 2025
+// Version: 3.3 | Updated with Permission Checks
+// Last Updated: 2026
 // ============================================
 
 // ============================================
@@ -9,29 +10,59 @@
 // ============================================
 
 // Google Apps Script URL for backend API
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxFwjqxDdC7uWqjF0CGbzYCHyZ1jZM_jsXz7P1FnNIANsAPpccZfvktQrFLrag3N1P/exec";
 
 // Global state variables
-let allAppointments = [];      // All appointments data
-let doctors = [];              // List of doctors
-let services = [];             // List of services
-let users = [];                // List of system users
-let permissions = [];          // Role permissions configuration
-let currentPage = 1;           // Current page for pagination
-let itemsPerPage = 20;         // Number of items per page
-let adminChart = null;         // Chart.js instance for reports
-let autoSyncInterval = null;    // Auto sync interval ID
-let currentUserRole = '';       // Current logged in user role
-let currentUserPermissions = []; // Current user permissions array
+let allAppointments = [];
+let doctors = [];
+let services = [];
+let users = [];
+let permissions = [];
+let currentPage = 1;
+let itemsPerPage = 20;
+let adminChart = null;
+let autoSyncInterval = null;
+let currentUserRole = '';
+let currentUserPermissions = [];
 
 // ============================================
-// SECTION 2: PERMISSION CHECK FUNCTIONS
+// SECTION 2: ROLE & PERMISSION CHECK
 // ============================================
 
 /**
- * Check if current user has specific permission
- * @param {string} permission - Permission to check
- * @returns {boolean} True if user has permission
+ * ইউজারের রোল চেক করে (রিসেপশনিস্ট চেক সহ)
+ */
+function checkUserAccess() {
+  const adminRole = sessionStorage.getItem('admin_role');
+  const adminLoggedIn = sessionStorage.getItem('admin_logged_in');
+  
+  // লগইন চেক
+  if (!adminLoggedIn || adminLoggedIn !== 'true') {
+    console.warn('🔒 No login found. Redirecting to login page...');
+    window.location.href = 'admin-login.html';
+    return false;
+  }
+  
+  // 🔥 গুরুত্বপূর্ণ: রিসেপশনিস্ট চেক 🔥
+  // রিসেপশনিস্টরা যাতে অ্যাডমিন ড্যাশবোর্ডে ঢুকতে না পারে
+  if (adminRole === 'receptionist') {
+    console.warn('🚫 Receptionist access denied to Admin Dashboard. Redirecting to Reception Dashboard...');
+    window.location.href = 'reception-dashboard.html';
+    return false;
+  }
+  
+  return true;
+}
+
+// মেইন ফাংশন শুরু হওয়ার আগে চেক করুন
+(function() {
+  if (!checkUserAccess()) {
+    return;
+  }
+})();
+
+/**
+ * ইউজারের পারমিশন চেক করে
  */
 function hasPermission(permission) {
   if (currentUserRole === 'super_admin') return true;
@@ -39,23 +70,7 @@ function hasPermission(permission) {
 }
 
 /**
- * Check permission and execute callback or show denied modal
- * @param {string} permission - Required permission
- * @param {Function} callback - Function to execute if permission granted
- * @returns {boolean} True if permission granted
- */
-function checkPermissionAndRedirect(permission, callback) {
-  if (hasPermission(permission)) {
-    if (callback) callback();
-    return true;
-  } else {
-    showPermissionDenied();
-    return false;
-  }
-}
-
-/**
- * Show permission denied modal
+ * পারমিশন ডিনাইড মেসেজ দেখায়
  */
 function showPermissionDenied() {
   const modal = document.getElementById('permissionDeniedModal');
@@ -72,7 +87,7 @@ function showPermissionDenied() {
 }
 
 /**
- * Close permission denied modal
+ * পারমিশন মডাল বন্ধ করে
  */
 function closePermissionModal() {
   const modal = document.getElementById('permissionDeniedModal');
@@ -82,49 +97,35 @@ function closePermissionModal() {
   }
 }
 
-/**
- * Show toast notification message
- * @param {string} message - Message to display
- * @param {string} type - Message type ('success' or 'error')
- */
-function showToast(message, type) {
-  const toastId = type === 'success' ? 'successToast' : 'errorToast';
-  let toast = document.getElementById(toastId);
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = toastId;
-    toast.className = 'toast-notification ' + type;
-    document.body.appendChild(toast);
-  }
-  const msgSpan = toast.querySelector('span');
-  if (msgSpan) {
-    msgSpan.innerText = message;
-  } else {
-    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> <span>${message}</span>`;
-  }
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-  }, 3000);
-}
-
 // ============================================
-// SECTION 3: LOAD USER PERMISSIONS
+// SECTION 3: USER PERMISSIONS LOAD
 // ============================================
 
 /**
- * Load user permissions based on role from sessionStorage
+ * ইউজারের পারমিশন লোড করে এবং মেনু আপডেট করে
  */
 function loadUserPermissions() {
-  currentUserRole = sessionStorage.getItem('admin_role') || 'super_admin';
+  currentUserRole = sessionStorage.getItem('admin_role') || 'manager';
   const permissionsStr = sessionStorage.getItem('admin_permissions') || '';
+  
   currentUserPermissions = permissionsStr === 'full' ? 
     ['full', 'view_appointments', 'add_appointments', 'edit_appointments', 'manage_doctors', 'manage_services', 'reports'] : 
     permissionsStr.split(',');
   
-  // Apply UI restrictions based on permissions
+  console.log('👤 User Role:', currentUserRole);
+  console.log('🔑 User Permissions:', currentUserPermissions);
+  
+  // নেভিগেশন মেনু আপডেট - পারমিশন ভিত্তিক দেখানো/লুকানো
   document.querySelectorAll('.nav-item').forEach(item => {
     const requiredPerm = item.getAttribute('data-permission');
+    
+    // শুধু সুপার অ্যাডমিন দেখতে পারে এমন মেনু
+    if (requiredPerm === 'full' && currentUserRole !== 'super_admin') {
+      item.style.display = 'none';
+      return;
+    }
+    
+    // অন্যান্য পারমিশন চেক
     if (requiredPerm && requiredPerm !== 'full') {
       if (!hasPermission(requiredPerm) && currentUserRole !== 'super_admin') {
         item.classList.add('disabled');
@@ -134,10 +135,12 @@ function loadUserPermissions() {
         item.classList.remove('disabled');
         item.style.pointerEvents = 'auto';
         item.style.opacity = '1';
+        item.style.display = 'flex';
       }
     }
   });
   
+  // ইউজার রোল ব্যাজ আপডেট
   const userRoleBadge = document.getElementById('userRoleBadge');
   if (userRoleBadge) {
     userRoleBadge.innerText = currentUserRole === 'super_admin' ? 'Super Admin' : 
@@ -146,43 +149,24 @@ function loadUserPermissions() {
 }
 
 // ============================================
-// SECTION 4: BANGLADESH TIME ZONE (UTC+6)
+// SECTION 4: AUTHENTICATION CHECK (MAIN)
 // ============================================
 
 /**
- * Get current time in Bangladesh Time Zone (UTC+6)
- * @returns {Date} Current date and time in Bangladesh
- */
-function getBangladeshTime() {
-  const now = new Date();
-  return new Date(now.getTime() + (6 * 60 * 60 * 1000));
-}
-
-/**
- * Get current date in Bangladesh Time Zone formatted as YYYY-MM-DD
- * @returns {string} Formatted date string
- */
-function getBangladeshDate() {
-  const bdTime = getBangladeshTime();
-  return `${bdTime.getFullYear()}-${String(bdTime.getMonth() + 1).padStart(2, '0')}-${String(bdTime.getDate()).padStart(2, '0')}`;
-}
-
-// ============================================
-// SECTION 5: AUTHENTICATION CHECK
-// ============================================
-
-/**
- * Check if admin is logged in, redirect to login page if not
+ * মেইন অথেনটিকেশন চেক - পেজ লোডের সময় রান করে
  */
 (function() {
-  if (!sessionStorage.getItem('admin_logged_in')) {
-    window.location.href = 'admin-login.html';
+  // প্রথমে রিসেপশনিস্ট চেক
+  if (!checkUserAccess()) {
     return;
   }
+  
+  // লোড ইউজার পারমিশন
   loadUserPermissions();
   
+  // অ্যাডমিন তথ্য UI তে সেট করুন
   const adminName = sessionStorage.getItem('admin_name') || 'Admin';
-  const adminRole = sessionStorage.getItem('admin_role') || 'Administrator';
+  const adminRole = sessionStorage.getItem('admin_role') || 'Manager';
   
   const welcomeName = document.getElementById('welcomeName');
   const adminNameSpan = document.getElementById('adminName');
@@ -192,17 +176,45 @@ function getBangladeshDate() {
   if (adminNameSpan) adminNameSpan.innerText = adminName;
   if (adminRoleSpan) adminRoleSpan.innerText = adminRole === 'super_admin' ? 'Super Admin' : (adminRole === 'manager' ? 'Manager' : 'Receptionist');
   
+  // সব ডাটা লোড করুন
   loadUsers();
   loadPermissionsConfig();
 })();
 
 // ============================================
+// SECTION 5: BANGLADESH TIME ZONE
+// ============================================
+
+function getBangladeshTime() {
+  const now = new Date();
+  const utcTime = now.getTime();
+  const bdTime = new Date(utcTime + (6 * 60 * 60 * 1000));
+  return bdTime;
+}
+
+function getBangladeshDate() {
+  const bdTime = getBangladeshTime();
+  const year = bdTime.getUTCFullYear();
+  const month = String(bdTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(bdTime.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getBangladeshFormattedTime() {
+  const bdTime = getBangladeshTime();
+  let hours = bdTime.getUTCHours();
+  const minutes = bdTime.getUTCMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+  return `${hours}:${minutesStr} ${ampm}`;
+}
+
+// ============================================
 // SECTION 6: INITIALIZATION
 // ============================================
 
-/**
- * Main initialization function - runs when page loads
- */
 document.addEventListener('DOMContentLoaded', function() {
   updateDateTime();
   setInterval(updateDateTime, 1000);
@@ -214,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSlotConfig();
   loadPricing();
   startAutoSync();
+  loadActiveKeys();
   
   const refreshBtn = document.querySelector('.refresh-btn');
   if (refreshBtn) refreshBtn.onclick = () => refreshAllData();
@@ -222,39 +235,177 @@ document.addEventListener('DOMContentLoaded', function() {
   if (reportDate) reportDate.value = getBangladeshDate();
 });
 
-/**
- * Update date and time display in header
- */
 function updateDateTime() {
   const bdTime = getBangladeshTime();
   const dateElem = document.getElementById('currentDate');
   const timeElem = document.getElementById('currentTime');
-  if (dateElem) dateElem.innerText = bdTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  if (timeElem) timeElem.innerText = bdTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  
+  if (dateElem) {
+    dateElem.innerText = bdTime.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC'
+    });
+  }
+  
+  if (timeElem) {
+    timeElem.innerText = getBangladeshFormattedTime();
+  }
 }
 
 // ============================================
-// SECTION 7: AUTO SYNC FUNCTION
+// SECTION 7: NAVIGATION SETUP
 // ============================================
 
-/**
- * Start auto sync interval (every 15 seconds)
- */
+function setupNavigation() {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    if (item.classList.contains('disabled')) return;
+    
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const requiredPerm = item.getAttribute('data-permission');
+      if (requiredPerm && requiredPerm !== 'full') {
+        if (!hasPermission(requiredPerm) && currentUserRole !== 'super_admin') {
+          showPermissionDenied();
+          return;
+        }
+      }
+      
+      const page = item.getAttribute('data-page');
+      
+      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+      item.classList.add('active');
+      
+      document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+      const targetPage = document.getElementById(page + 'Page');
+      if (targetPage) targetPage.classList.add('active');
+      
+      const pageTitle = document.getElementById('pageTitle');
+      if (pageTitle) pageTitle.innerText = item.querySelector('span')?.innerText || page;
+      
+      if (page === 'appointments') loadAllAppointmentsList();
+      if (page === 'reports') { updateReportStats(); createWeeklyChart(); loadReport(); }
+      if (page === 'permissions') loadPermissionsUI();
+      if (page === 'settings') loadActiveKeys();
+    });
+  });
+}
+
+function goToPage(pageId) {
+  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if (navItem && !navItem.classList.contains('disabled')) navItem.click();
+  else showPermissionDenied();
+}
+
+// ============================================
+// SECTION 8: JSONP API HELPER FUNCTIONS
+// ============================================
+
+function jsonpRequest(action, params = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `jsonp_callback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const script = document.createElement('script');
+    
+    let url = `${SCRIPT_URL}?action=${action}&callback=${callbackName}&t=${Date.now()}`;
+    for (const key in params) {
+      if (params[key] !== undefined && params[key] !== null) {
+        url += `&${key}=${encodeURIComponent(params[key])}`;
+      }
+    }
+    
+    const timeout = setTimeout(() => {
+      delete window[callbackName];
+      if (document.body.contains(script)) script.remove();
+      reject(new Error('JSONP request timeout'));
+    }, 15000);
+    
+    window[callbackName] = function(data) {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      if (document.body.contains(script)) script.remove();
+      resolve(data);
+    };
+    
+    script.onerror = function() {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      if (document.body.contains(script)) script.remove();
+      reject(new Error('JSONP request failed'));
+    };
+    
+    script.src = url;
+    document.body.appendChild(script);
+  });
+}
+
+async function postToAPI(data) {
+  return new Promise((resolve) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = SCRIPT_URL;
+    form.target = 'hidden_iframe';
+    form.style.display = 'none';
+    
+    let iframe = document.querySelector('#hidden_iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.name = 'hidden_iframe';
+      iframe.id = 'hidden_iframe';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+    
+    iframe.onload = function() {
+      resolve({ success: true });
+    };
+    
+    for (const key in data) {
+      const field = document.createElement('input');
+      field.type = 'hidden';
+      field.name = key;
+      field.value = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+      form.appendChild(field);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+    
+    setTimeout(() => {
+      if (document.body.contains(form)) document.body.removeChild(form);
+    }, 100);
+    
+    setTimeout(() => {
+      resolve({ success: true });
+    }, 2000);
+  });
+}
+
+async function fetchFromAPI(action, params = {}) {
+  try {
+    return await jsonpRequest(action, params);
+  } catch (error) {
+    console.error('API Error:', error);
+    showToast('Network error. Please check your connection.', 'error');
+    return null;
+  }
+}
+
+// ============================================
+// SECTION 9: AUTO SYNC
+// ============================================
+
 function startAutoSync() {
   if (autoSyncInterval) clearInterval(autoSyncInterval);
   autoSyncInterval = setInterval(autoSyncData, 15000);
 }
 
-/**
- * Auto sync data from Google Sheets API
- */
 async function autoSyncData() {
   if (!hasPermission('view_appointments')) return;
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getAppointments&t=${Date.now()}`);
-    const text = await response.text();
-    const jsonStr = text.match(/\((.*)\)/)[1];
-    const data = JSON.parse(jsonStr);
+    const data = await fetchFromAPI('getAppointments');
     if (data && data.appointments) {
       allAppointments = data.appointments;
       updateDashboardStats();
@@ -268,95 +419,28 @@ async function autoSyncData() {
       if (totalRecords) totalRecords.innerText = allAppointments.length;
       const syncStatus = document.getElementById('syncStatus');
       if (syncStatus) {
-        syncStatus.innerHTML = `<i class="fas fa-check-circle"></i> Synced at ${new Date().toLocaleTimeString()}`;
+        syncStatus.innerHTML = `<i class="fas fa-check-circle"></i> Synced at ${getBangladeshFormattedTime()}`;
         syncStatus.style.opacity = '1';
         setTimeout(() => { if (syncStatus) syncStatus.style.opacity = '0'; }, 2000);
       }
       if (document.getElementById('appointmentsPage')?.classList.contains('active')) loadAllAppointmentsList();
     }
-  } catch (error) { console.error('Auto sync error:', error); }
+  } catch (error) {
+    console.error('Auto sync error:', error);
+  }
 }
 
-/**
- * Refresh all data manually
- */
 function refreshAllData() { 
-  autoSyncData(); 
+  loadAllData(); 
   loadDoctors(); 
   loadServices(); 
   showToast('Data refreshed successfully!', 'success'); 
 }
 
 // ============================================
-// SECTION 8: NAVIGATION
+// SECTION 10: LOAD APPOINTMENTS
 // ============================================
 
-/**
- * Setup sidebar navigation event listeners
- */
-function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (item.classList.contains('disabled')) {
-        showPermissionDenied();
-        return;
-      }
-      const page = item.getAttribute('data-page');
-      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-      item.classList.add('active');
-      document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
-      const targetPage = document.getElementById(page + 'Page');
-      if (targetPage) targetPage.classList.add('active');
-      const pageTitle = document.getElementById('pageTitle');
-      if (pageTitle) pageTitle.innerText = item.querySelector('span')?.innerText || page;
-      if (page === 'appointments') loadAllAppointmentsList();
-      if (page === 'reports') { updateReportStats(); createWeeklyChart(); loadReport(); }
-      if (page === 'permissions') loadPermissionsUI();
-    });
-  });
-}
-
-/**
- * Navigate to specific page by ID
- * @param {string} pageId - ID of the page to navigate to
- */
-function goToPage(pageId) {
-  const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-  if (navItem && !navItem.classList.contains('disabled')) navItem.click();
-  else showPermissionDenied();
-}
-
-// ============================================
-// SECTION 9: API CALLS
-// ============================================
-
-/**
- * Fetch data from Google Apps Script API
- * @param {string} action - API action name
- * @param {Object} params - Additional parameters
- * @returns {Promise<Object>} API response
- */
-async function fetchFromAPI(action, params = {}) {
-  try {
-    let url = `${SCRIPT_URL}?action=${action}&t=${Date.now()}`;
-    if (action === 'getClientBookings' && params.phone) {
-      url += `&phone=${encodeURIComponent(params.phone)}`;
-    }
-    const response = await fetch(url);
-    const text = await response.text();
-    const jsonStr = text.match(/\((.*)\)/)[1];
-    return JSON.parse(jsonStr);
-  } catch (error) { console.error('API Error:', error); return null; }
-}
-
-// ============================================
-// SECTION 10: LOAD APPOINTMENTS DATA
-// ============================================
-
-/**
- * Load all appointment data from API
- */
 async function loadAllData() {
   if (!hasPermission('view_appointments')) return;
   const data = await fetchFromAPI('getAppointments');
@@ -372,12 +456,11 @@ async function loadAllData() {
     const totalRecords = document.getElementById('totalRecords');
     if (totalRecords) totalRecords.innerText = allAppointments.length;
     if (document.getElementById('appointmentsPage')?.classList.contains('active')) loadAllAppointmentsList();
-  } else { showToast('Could not load data from server', 'error'); }
+  } else {
+    showToast('Could not load data from server', 'error');
+  }
 }
 
-/**
- * Update dashboard statistics cards
- */
 function updateDashboardStats() {
   const today = getBangladeshDate();
   const todayApps = allAppointments.filter(a => a.date === today);
@@ -404,9 +487,6 @@ function updateDashboardStats() {
   if (totalPending) totalPending.innerText = pendingApps.length;
 }
 
-/**
- * Update quick statistics in sidebar
- */
 function updateQuickStats() {
   const revenueElem = document.getElementById('totalRevenue');
   const rateElem = document.getElementById('completionRate');
@@ -418,9 +498,6 @@ function updateQuickStats() {
   if (doctorsElem) doctorsElem.innerText = doctors.length || 1;
 }
 
-/**
- * Load recent appointments for dashboard
- */
 function loadRecentAppointments() {
   const container = document.getElementById('recentAppointments');
   if (!container) return;
@@ -435,18 +512,14 @@ function loadRecentAppointments() {
 }
 
 // ============================================
-// SECTION 11: ALL APPOINTMENTS LIST (FIXED LOADING ISSUE)
+// SECTION 11: ALL APPOINTMENTS LIST
 // ============================================
 
-/**
- * Load all appointments list with filters and pagination
- */
 function loadAllAppointmentsList() {
   if (!hasPermission('view_appointments')) return;
   const container = document.getElementById('allAppointmentsList');
   if (!container) return;
   
-  // Show loading state
   container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading appointments...</div>';
   
   const filterText = document.getElementById('filterInput')?.value.toLowerCase() || '';
@@ -497,10 +570,6 @@ function loadAllAppointmentsList() {
   renderPagination(totalPages);
 }
 
-/**
- * Render pagination buttons
- * @param {number} totalPages - Total number of pages
- */
 function renderPagination(totalPages) {
   const container = document.getElementById('pagination');
   if (!container) return;
@@ -512,31 +581,20 @@ function renderPagination(totalPages) {
   container.innerHTML = html;
 }
 
-/**
- * Go to specific page number
- * @param {number} page - Page number to navigate to
- */
 function goToPageNum(page) { 
   currentPage = page; 
   loadAllAppointmentsList(); 
 }
 
-/**
- * Filter appointments (reset to page 1)
- */
 function filterAppointments() { 
   currentPage = 1; 
   loadAllAppointmentsList(); 
 }
 
 // ============================================
-// SECTION 12: VIEW APPOINTMENT DETAILS (FIXED)
+// SECTION 12: VIEW APPOINTMENT
 // ============================================
 
-/**
- * View appointment details in modal
- * @param {string} bookingId - Booking ID to view
- */
 function viewAppointment(bookingId) {
   const app = allAppointments.find(a => a.bookingId === bookingId);
   if (!app) {
@@ -547,27 +605,22 @@ function viewAppointment(bookingId) {
   const modal = document.getElementById('viewAppointmentModal');
   const detailsDiv = document.getElementById('appointmentDetails');
   
-  if (!modal || !detailsDiv) {
-    console.error('Modal or details div not found');
-    return;
-  }
+  if (!modal || !detailsDiv) return;
   
   detailsDiv.innerHTML = `
     <div class="appointment-full-details" style="padding: 10px;">
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🆔 Token:</strong> <span>${app.token}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📅 Date:</strong> <span>${app.date}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">⏰ Time:</strong> <span>${app.time}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🐾 Pet Name:</strong> <span>${escapeHtml(app.petName)}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🎂 Pet Age:</strong> <span>${app.petAge || 'N/A'}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">⚖️ Weight:</strong> <span>${app.weight || 'N/A'} kg</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">👤 Owner Name:</strong> <span>${escapeHtml(app.ownerName)}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📞 Phone:</strong> <span>${app.ownerPhone}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📋 Symptoms:</strong> <span>${escapeHtml(app.symptoms || 'N/A')}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">🩺 Diagnosis:</strong> <span>${escapeHtml(app.diagnosis || 'N/A')}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">💊 Prescription:</strong> <span>${escapeHtml(app.prescription || 'N/A')}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📝 Treatment Plan:</strong> <span>${escapeHtml(app.treatmentPlan || 'N/A')}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">📅 Follow-up Date:</strong> <span>${app.followUpDate || 'N/A'}</span></div>
-      <div class="detail-row" style="display: flex; padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong style="width: 140px;">✅ Status:</strong> <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
+      <div><strong>🆔 Token:</strong> ${app.token}</div>
+      <div><strong>📅 Date:</strong> ${app.date}</div>
+      <div><strong>⏰ Time:</strong> ${app.time}</div>
+      <div><strong>🐾 Pet Name:</strong> ${escapeHtml(app.petName)}</div>
+      <div><strong>🎂 Pet Age:</strong> ${app.petAge || 'N/A'}</div>
+      <div><strong>⚖️ Weight:</strong> ${app.weight || 'N/A'} kg</div>
+      <div><strong>👤 Owner Name:</strong> ${escapeHtml(app.ownerName)}</div>
+      <div><strong>📞 Phone:</strong> ${app.ownerPhone}</div>
+      <div><strong>📋 Symptoms:</strong> ${escapeHtml(app.symptoms || 'N/A')}</div>
+      <div><strong>🩺 Diagnosis:</strong> ${escapeHtml(app.diagnosis || 'N/A')}</div>
+      <div><strong>💊 Prescription:</strong> ${escapeHtml(app.prescription || 'N/A')}</div>
+      <div><strong>✅ Status:</strong> <span class="status ${app.status === 'Completed' ? 'completed' : 'confirmed'}">${app.status || 'Confirmed'}</span></div>
     </div>
   `;
   
@@ -576,9 +629,6 @@ function viewAppointment(bookingId) {
   window.currentViewBookingId = bookingId;
 }
 
-/**
- * Close view appointment modal
- */
 function closeViewAppointmentModal() {
   const modal = document.getElementById('viewAppointmentModal');
   if (modal) {
@@ -587,20 +637,6 @@ function closeViewAppointmentModal() {
   }
 }
 
-/**
- * Delete appointment from modal
- */
-function deleteAppointmentFromModal() { 
-  if (confirm('Are you sure you want to delete this appointment?')) {
-    hardDeleteAppointment(window.currentViewBookingId); 
-    closeViewAppointmentModal(); 
-  } 
-}
-
-/**
- * Edit appointment status
- * @param {string} bookingId - Booking ID to edit
- */
 function editAppointment(bookingId) {
   const newStatus = prompt('Change status (Confirmed/In Progress/Completed/Cancelled):');
   if (newStatus && ['Confirmed', 'In Progress', 'Completed', 'Cancelled'].includes(newStatus)) {
@@ -612,24 +648,17 @@ function editAppointment(bookingId) {
 }
 
 // ============================================
-// SECTION 12.1: FIXED DELETE APPOINTMENT FUNCTION
+// SECTION 13: DELETE APPOINTMENT
 // ============================================
 
-/**
- * Hard delete appointment from all storage locations
- * @param {string} bookingId - Booking ID to delete
- */
-function hardDeleteAppointment(bookingId) {
+async function hardDeleteAppointment(bookingId) {
   if (confirm('⚠️ PERMANENT DELETE: This will remove the appointment from all records. Continue?')) {
-    
-    // Find the appointment to delete for logging
     const appointmentToDelete = allAppointments.find(a => a.bookingId === bookingId);
-    const initialLength = allAppointments.length;
     
-    // 1. Remove from allAppointments array
+    await postToAPI({ action: 'deleteBooking', bookingId: bookingId });
+    
     allAppointments = allAppointments.filter(a => a.bookingId !== bookingId);
     
-    // 2. Update localStorage backup (vet_bookings)
     const bookings = {};
     allAppointments.forEach(a => {
       if (!bookings[a.date]) bookings[a.date] = [];
@@ -637,61 +666,38 @@ function hardDeleteAppointment(bookingId) {
     });
     localStorage.setItem('vet_bookings', JSON.stringify(bookings));
     
-    // 3. Force refresh the UI
     refreshAllData();
     
-    // 4. Reload current page view
     if (document.getElementById('appointmentsPage')?.classList.contains('active')) {
-      setTimeout(() => {
-        loadAllAppointmentsList();
-      }, 100);
+      setTimeout(() => loadAllAppointmentsList(), 100);
     }
     
-    // 5. Update dashboard stats
     updateDashboardStats();
     loadRecentAppointments();
     updateQuickStats();
     
-    // 6. Update appointment badge
     const today = getBangladeshDate();
     const todayCount = allAppointments.filter(a => a.date === today).length;
     const badge = document.getElementById('appointmentBadge');
     if (badge) badge.innerText = todayCount;
     
-    // 7. Update total records count
     const totalRecords = document.getElementById('totalRecords');
     if (totalRecords) totalRecords.innerText = allAppointments.length;
     
-    // 8. Show success message with details
     if (appointmentToDelete) {
-      showToast(`✅ Appointment for "${appointmentToDelete.petName}" deleted successfully! Removed from ${initialLength - allAppointments.length} record(s).`, 'success');
+      showToast(`✅ Appointment for "${appointmentToDelete.petName}" deleted successfully!`, 'success');
     } else {
-      showToast(`✅ Appointment deleted successfully! Removed from ${initialLength - allAppointments.length} record(s).`, 'success');
+      showToast(`✅ Appointment deleted successfully!`, 'success');
     }
     
-    // 9. Log for debugging
-    console.log(`Deleted appointment: ${bookingId}. Remaining appointments: ${allAppointments.length}`);
-    
-    // 10. Close modal if open
     closeViewAppointmentModal();
   }
 }
 
-/**
- * Alternative: Simple delete with confirmation
- * @param {string} bookingId - Booking ID to delete
- */
-function deleteAppointment(bookingId) {
-  hardDeleteAppointment(bookingId);
-}
-
 // ============================================
-// SECTION 13: DOCTOR MANAGEMENT (CRUD)
+// SECTION 14: DOCTOR MANAGEMENT
 // ============================================
 
-/**
- * Load doctors from localStorage
- */
 function loadDoctors() {
   if (!hasPermission('manage_doctors')) return;
   const stored = localStorage.getItem('clinic_doctors');
@@ -700,9 +706,6 @@ function loadDoctors() {
   renderDoctors();
 }
 
-/**
- * Render doctors list in UI
- */
 function renderDoctors() {
   const container = document.getElementById('doctorsList');
   if (!container) return;
@@ -714,7 +717,6 @@ function renderDoctors() {
           <div><i class="fas fa-user-md" style="color:#f97316"></i> <strong>${escapeHtml(doc.name)}</strong></div>
           <div style="font-size:0.85rem">🔬 ${escapeHtml(doc.specialization)}</div>
           <div style="font-size:0.8rem">📧 ${doc.email} | 📞 ${doc.phone || 'N/A'}</div>
-          <div style="font-size:0.8rem">⏰ ${doc.schedule || 'Flexible'}</div>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn-secondary" onclick="openEditDoctorModal(${doc.id})"><i class="fas fa-edit"></i> Edit</button>
@@ -725,9 +727,6 @@ function renderDoctors() {
   `).join('');
 }
 
-/**
- * Show add doctor modal
- */
 function showAddDoctorModal() { 
   const m = document.getElementById('addDoctorModal'); 
   if(m) { 
@@ -736,9 +735,6 @@ function showAddDoctorModal() {
   } 
 }
 
-/**
- * Close add doctor modal
- */
 function closeAddDoctorModal() { 
   const m = document.getElementById('addDoctorModal'); 
   if(m) { 
@@ -748,9 +744,6 @@ function closeAddDoctorModal() {
   } 
 }
 
-/**
- * Add new doctor
- */
 function addDoctor() {
   const newDoctor = { 
     id: Date.now(), 
@@ -772,10 +765,6 @@ function addDoctor() {
   showToast('✅ Doctor added successfully!', 'success');
 }
 
-/**
- * Open edit doctor modal
- * @param {number} id - Doctor ID to edit
- */
 function openEditDoctorModal(id) {
   const doctor = doctors.find(d => d.id === id);
   if (!doctor) return;
@@ -793,9 +782,6 @@ function openEditDoctorModal(id) {
   }
 }
 
-/**
- * Close edit doctor modal
- */
 function closeEditDoctorModal() { 
   const m = document.getElementById('editDoctorModal'); 
   if(m) { 
@@ -804,9 +790,6 @@ function closeEditDoctorModal() {
   } 
 }
 
-/**
- * Update doctor information
- */
 function updateDoctor() {
   const id = parseInt(document.getElementById('editDoctorId')?.value);
   const index = doctors.findIndex(d => d.id === id);
@@ -828,10 +811,6 @@ function updateDoctor() {
   }
 }
 
-/**
- * Delete doctor
- * @param {number} id - Doctor ID to delete
- */
 function deleteDoctor(id) { 
   if (confirm('⚠️ Delete this doctor permanently?')) { 
     doctors = doctors.filter(d => d.id !== id); 
@@ -842,12 +821,9 @@ function deleteDoctor(id) {
 }
 
 // ============================================
-// SECTION 14: SERVICES MANAGEMENT (CRUD)
+// SECTION 15: SERVICES MANAGEMENT
 // ============================================
 
-/**
- * Load services from localStorage
- */
 function loadServices() {
   if (!hasPermission('manage_services')) return;
   const stored = localStorage.getItem('clinic_services');
@@ -856,9 +832,6 @@ function loadServices() {
   renderServices();
 }
 
-/**
- * Render services list in UI
- */
 function renderServices() {
   const container = document.getElementById('servicesList');
   if (!container) return;
@@ -880,9 +853,6 @@ function renderServices() {
   `).join('');
 }
 
-/**
- * Show add service modal
- */
 function showAddServiceModal() { 
   const m = document.getElementById('addServiceModal'); 
   if(m) { 
@@ -891,9 +861,6 @@ function showAddServiceModal() {
   } 
 }
 
-/**
- * Close add service modal
- */
 function closeAddServiceModal() { 
   const m = document.getElementById('addServiceModal'); 
   if(m) { 
@@ -903,9 +870,6 @@ function closeAddServiceModal() {
   } 
 }
 
-/**
- * Add new service
- */
 function addService() {
   const newService = { 
     id: Date.now(), 
@@ -926,10 +890,6 @@ function addService() {
   showToast('✅ Service added successfully!', 'success');
 }
 
-/**
- * Open edit service modal
- * @param {number} id - Service ID to edit
- */
 function openEditServiceModal(id) {
   const service = services.find(s => s.id === id);
   if (!service) return;
@@ -946,9 +906,6 @@ function openEditServiceModal(id) {
   }
 }
 
-/**
- * Close edit service modal
- */
 function closeEditServiceModal() { 
   const m = document.getElementById('editServiceModal'); 
   if(m) { 
@@ -957,9 +914,6 @@ function closeEditServiceModal() {
   } 
 }
 
-/**
- * Update service information
- */
 function updateService() {
   const id = parseInt(document.getElementById('editServiceId')?.value);
   const index = services.findIndex(s => s.id === id);
@@ -979,10 +933,6 @@ function updateService() {
   }
 }
 
-/**
- * Delete service
- * @param {number} id - Service ID to delete
- */
 function deleteService(id) { 
   if (confirm('⚠️ Delete this service permanently?')) { 
     services = services.filter(s => s.id !== id); 
@@ -993,12 +943,9 @@ function deleteService(id) {
 }
 
 // ============================================
-// SECTION 15: USER MANAGEMENT (Only Super Admin)
+// SECTION 16: USER MANAGEMENT
 // ============================================
 
-/**
- * Load users from localStorage
- */
 function loadUsers() {
   if (currentUserRole !== 'super_admin') return;
   const stored = localStorage.getItem('system_users');
@@ -1015,9 +962,6 @@ function loadUsers() {
   renderUsers();
 }
 
-/**
- * Render users list in UI
- */
 function renderUsers() {
   const container = document.getElementById('usersList');
   if (!container) return;
@@ -1039,9 +983,6 @@ function renderUsers() {
   `).join('');
 }
 
-/**
- * Show add user modal
- */
 function showAddUserModal() { 
   if (currentUserRole !== 'super_admin') { 
     showPermissionDenied(); 
@@ -1054,9 +995,6 @@ function showAddUserModal() {
   } 
 }
 
-/**
- * Close add user modal
- */
 function closeAddUserModal() { 
   const m = document.getElementById('addUserModal'); 
   if(m) { 
@@ -1066,9 +1004,6 @@ function closeAddUserModal() {
   } 
 }
 
-/**
- * Add new user
- */
 function addUser() {
   const newUser = { 
     id: Date.now(), 
@@ -1088,10 +1023,6 @@ function addUser() {
   showToast('✅ User added successfully!', 'success');
 }
 
-/**
- * Open edit user modal
- * @param {number} id - User ID to edit
- */
 function openEditUserModal(id) {
   const user = users.find(u => u.id === id);
   if (!user) return;
@@ -1107,9 +1038,6 @@ function openEditUserModal(id) {
   }
 }
 
-/**
- * Close edit user modal
- */
 function closeEditUserModal() { 
   const m = document.getElementById('editUserModal'); 
   if(m) { 
@@ -1118,9 +1046,6 @@ function closeEditUserModal() {
   } 
 }
 
-/**
- * Update user information
- */
 function updateUser() {
   const id = parseInt(document.getElementById('editUserId')?.value);
   const index = users.findIndex(u => u.id === id);
@@ -1140,10 +1065,6 @@ function updateUser() {
   }
 }
 
-/**
- * Delete user
- * @param {number} id - User ID to delete
- */
 function deleteUser(id) { 
   if (confirm('⚠️ Delete this user permanently?')) { 
     users = users.filter(u => u.id !== id); 
@@ -1154,12 +1075,9 @@ function deleteUser(id) {
 }
 
 // ============================================
-// SECTION 16: PERMISSIONS MANAGEMENT
+// SECTION 17: PERMISSIONS MANAGEMENT
 // ============================================
 
-/**
- * Load permissions configuration from localStorage
- */
 function loadPermissionsConfig() {
   const stored = localStorage.getItem('role_permissions');
   if (stored) {
@@ -1174,9 +1092,6 @@ function loadPermissionsConfig() {
   }
 }
 
-/**
- * Load permissions UI for configuration
- */
 function loadPermissionsUI() {
   if (currentUserRole !== 'super_admin') { 
     showPermissionDenied(); 
@@ -1210,9 +1125,6 @@ function loadPermissionsUI() {
   `).join('');
 }
 
-/**
- * Save permissions configuration
- */
 function savePermissions() {
   const newPermissions = [];
   document.querySelectorAll('.permission-item input[type="checkbox"]:not([disabled])').forEach(checkbox => {
@@ -1231,12 +1143,9 @@ function savePermissions() {
 }
 
 // ============================================
-// SECTION 17: SETTINGS & CONFIGURATION
+// SECTION 18: SETTINGS
 // ============================================
 
-/**
- * Load settings from localStorage
- */
 function loadSettings() {
   const settings = JSON.parse(localStorage.getItem('clinic_settings') || '{}');
   const nameEl = document.getElementById('clinicName'); if(nameEl) nameEl.value = settings.clinicName || 'VET FOR PET CLINIC';
@@ -1246,9 +1155,6 @@ function loadSettings() {
   const emailEl = document.getElementById('clinicEmail'); if(emailEl) emailEl.value = settings.clinicEmail || 'info@vetforpet.com';
 }
 
-/**
- * Save clinic settings to localStorage
- */
 function saveSettings() {
   const settings = { 
     clinicName: document.getElementById('clinicName')?.value, 
@@ -1261,9 +1167,6 @@ function saveSettings() {
   showToast('✅ Settings saved successfully!', 'success');
 }
 
-/**
- * Load slot configuration from localStorage
- */
 function loadSlotConfig() {
   const defaultConfig = { 
     Saturday: { start: 9, end: 21 }, 
@@ -1286,9 +1189,6 @@ function loadSlotConfig() {
   `).join('');
 }
 
-/**
- * Save slot configuration to localStorage
- */
 function saveSlotConfig() {
   const newConfig = {};
   const days = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -1304,9 +1204,6 @@ function saveSlotConfig() {
   showToast('✅ Slot configuration saved!', 'success');
 }
 
-/**
- * Load pricing configuration from localStorage
- */
 function loadPricing() {
   const pricing = JSON.parse(localStorage.getItem('service_pricing') || '{}');
   const container = document.getElementById('pricingConfig');
@@ -1323,9 +1220,6 @@ function loadPricing() {
   }
 }
 
-/**
- * Save pricing configuration to localStorage
- */
 function savePricing() {
   const pricing = {};
   services.forEach(service => { 
@@ -1337,12 +1231,149 @@ function savePricing() {
 }
 
 // ============================================
-// SECTION 18: BACKUP & EXPORT
+// SECTION 19: ACCESS KEY GENERATOR
 // ============================================
 
-/**
- * Export appointments to CSV file
- */
+async function generateAccessKey() {
+  const role = document.getElementById('keyRole')?.value;
+  const expiryDays = parseInt(document.getElementById('keyExpiry')?.value);
+  
+  if (!role) {
+    showToast('Please select a role', 'error');
+    return;
+  }
+  
+  if (currentUserRole !== 'super_admin') {
+    showPermissionDenied();
+    return;
+  }
+  
+  showToast('Generating access key...', 'info');
+  
+  try {
+    const result = await postToAPI({
+      action: 'generateAccessKey',
+      role: role,
+      expiryDays: expiryDays,
+      createdBy: sessionStorage.getItem('admin_name') || 'Admin'
+    });
+    
+    if (result && result.success) {
+      const newAccessKeySpan = document.getElementById('newAccessKey');
+      const keyRoleDisplaySpan = document.getElementById('keyRoleDisplay');
+      const keyExpiryDisplaySpan = document.getElementById('keyExpiryDisplay');
+      const generatedKeyDisplay = document.getElementById('generatedKeyDisplay');
+      
+      if (newAccessKeySpan) newAccessKeySpan.innerText = result.key;
+      if (keyRoleDisplaySpan) keyRoleDisplaySpan.innerText = role;
+      if (keyExpiryDisplaySpan) keyExpiryDisplaySpan.innerText = new Date(result.expiryDate).toLocaleDateString();
+      if (generatedKeyDisplay) generatedKeyDisplay.style.display = 'block';
+      
+      showToast(`✅ Key generated successfully! Valid for ${expiryDays} days`, 'success');
+      loadActiveKeys();
+      
+      setTimeout(() => {
+        if (generatedKeyDisplay) generatedKeyDisplay.style.display = 'none';
+      }, 30000);
+    } else {
+      showToast(result?.error || 'Failed to generate key', 'error');
+    }
+  } catch (error) {
+    console.error('Error generating key:', error);
+    showToast('Error generating access key', 'error');
+  }
+}
+
+function copyAccessKey() {
+  const keyText = document.getElementById('newAccessKey')?.innerText;
+  if (keyText && keyText !== 'KEY-XXXX-XXXX-XXXX') {
+    navigator.clipboard.writeText(keyText);
+    showToast('✅ Access key copied to clipboard!', 'success');
+  } else {
+    showToast('No key to copy. Generate a key first.', 'error');
+  }
+}
+
+async function loadActiveKeys() {
+  if (currentUserRole !== 'super_admin') return;
+  
+  try {
+    const result = await fetchFromAPI('getAllAccessKeys');
+    
+    if (result && result.keys) {
+      displayActiveKeys(result.keys);
+    } else if (result && result.error) {
+      console.log('No keys found or error:', result.error);
+      displayActiveKeys([]);
+    }
+  } catch (error) {
+    console.error('Error loading keys:', error);
+    displayActiveKeys([]);
+  }
+}
+
+function displayActiveKeys(keys) {
+  const container = document.getElementById('keysTable');
+  if (!container) return;
+  
+  if (!keys || keys.length === 0) {
+    container.innerHTML = '<div class="empty-state"><i class="fas fa-key"></i> No active access keys</div>';
+    return;
+  }
+  
+  container.innerHTML = `
+    <table class="keys-table">
+      <thead>
+        <tr><th>Access Key</th><th>Role</th><th>Created By</th><th>Expires</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        ${keys.map(key => `
+          <tr>
+            <td><code>${maskKey(key.accessKey)}</code></td>
+            <td><span class="role-badge-${key.role?.toLowerCase() || 'admin'}">${key.role || 'ADMIN'}</span></td>
+            <td>${escapeHtml(key.createdBy || 'Admin')}</td>
+            <td>${new Date(key.expiryDate).toLocaleDateString()}</td>
+            <td><button onclick="revokeKey('${key.accessKey}')" class="btn-danger-small"><i class="fas fa-trash-alt"></i> Revoke</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function maskKey(key) {
+  if (!key || key.length < 12) return key || '';
+  return key.substring(0, 8) + '...' + key.substring(key.length - 4);
+}
+
+async function revokeKey(accessKeyToRevoke) {
+  if (!confirm('⚠️ Revoke this access key? It will no longer work for DELETE/CANCEL operations.')) {
+    return;
+  }
+  
+  try {
+    const result = await postToAPI({
+      action: 'revokeAccessKey',
+      accessKeyToRevoke: accessKeyToRevoke,
+      revokedBy: sessionStorage.getItem('admin_name') || 'Admin'
+    });
+    
+    if (result && result.success) {
+      showToast('✅ Access key revoked successfully', 'success');
+      loadActiveKeys();
+    } else {
+      showToast(result?.error || 'Failed to revoke key', 'error');
+    }
+  } catch (error) {
+    console.error('Error revoking key:', error);
+    showToast('Error revoking access key', 'error');
+  }
+}
+
+// ============================================
+// SECTION 20: BACKUP & EXPORT
+// ============================================
+
 function exportToCSV() {
   if (!allAppointments.length) { 
     showToast('❌ No data to export', 'error'); 
@@ -1360,19 +1391,11 @@ function exportToCSV() {
   showToast('📄 CSV exported successfully!', 'success');
 }
 
-/**
- * Escape string for CSV export
- * @param {string} str - String to escape
- * @returns {string} Escaped string
- */
 function escapeCsv(str) { 
   if(!str) return ''; 
   return str.replace(/"/g, '""'); 
 }
 
-/**
- * Download full backup as JSON file
- */
 function backupData() {
   const backup = { 
     appointments: allAppointments, 
@@ -1396,17 +1419,11 @@ function backupData() {
   showToast('💾 Backup downloaded successfully!', 'success');
 }
 
-/**
- * Trigger restore file picker
- */
 function triggerRestore() { 
   const rf = document.getElementById('restoreFile'); 
   if(rf) rf.click(); 
 }
 
-/**
- * Restore from backup file
- */
 document.getElementById('restoreFile')?.addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1456,12 +1473,9 @@ document.getElementById('restoreFile')?.addEventListener('change', function(e) {
 });
 
 // ============================================
-// SECTION 19: REPORTS & CHARTS
+// SECTION 21: REPORTS
 // ============================================
 
-/**
- * Update report statistics
- */
 function updateReportStats() {
   if (!hasPermission('reports')) return;
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -1477,9 +1491,6 @@ function updateReportStats() {
   createWeeklyChart();
 }
 
-/**
- * Create weekly appointments chart
- */
 function createWeeklyChart() {
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
@@ -1488,7 +1499,7 @@ function createWeeklyChart() {
     last7Days.push(date.toISOString().split('T')[0]);
   }
   const counts = last7Days.map(date => allAppointments.filter(a => a.date === date).length);
-  const ctx = document.getElementById('weeklyChart')?.getContext('2d');
+  const ctx = document.getElementById('reportChart')?.getContext('2d');
   if (!ctx) return;
   if (adminChart) adminChart.destroy();
   adminChart = new Chart(ctx, {
@@ -1501,9 +1512,6 @@ function createWeeklyChart() {
   });
 }
 
-/**
- * Load report based on type and date
- */
 async function loadReport() {
   if (!hasPermission('reports')) { 
     showPermissionDenied(); 
@@ -1540,10 +1548,11 @@ async function loadReport() {
       <p><i class="fas fa-calendar"></i> Total: ${filtered.length} | <i class="fas fa-check-circle"></i> Completed: ${filtered.filter(a => a.status === 'Completed').length} | <i class="fas fa-clock"></i> Pending: ${filtered.filter(a => a.status !== 'Completed').length}</p>
       <div class="report-list">
         <table class="report-table">
-          <thead><tr><th><i class="fas fa-calendar"></i> Date</th><th><i class="fas fa-paw"></i> Pet</th><th><i class="fas fa-user"></i> Owner</th><th><i class="fas fa-flag-checkered"></i> Status</th></tr></thead>
+          <thead><tr><th>Date</th><th>Pet</th><th>Owner</th><th>Status</th></tr></thead>
           <tbody>
             ${filtered.slice(0, 20).map(a => `
-              <tr><td>${a.date}侧<td><i class="fas fa-paw"></i> ${escapeHtml(a.petName)}侧<td><i class="fas fa-user"></i> ${escapeHtml(a.ownerName)}侧<td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span>侧)`).join('')}
+              <tr><td>${a.date}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span></td></tr>
+            `).join('')}
           </tbody>
         </table>
         ${filtered.length > 20 ? '<p><i class="fas fa-ellipsis-h"></i> ... and more</p>' : ''}
@@ -1552,9 +1561,6 @@ async function loadReport() {
   `;
 }
 
-/**
- * Print report
- */
 function printReport() {
   const container = document.getElementById('reportContainer');
   if (!container) return;
@@ -1565,24 +1571,18 @@ function printReport() {
   showToast('🖨️ Report sent to printer', 'success');
 }
 
-/**
- * Print all appointments
- */
 function printAllAppointments() {
   const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><title>All Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2><i class="fas fa-clinic-medical"></i> VET FOR PET CLINIC - All Appointments</h2><p>Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th><i class="fas fa-calendar"></i> Date</th><th><i class="fas fa-clock"></i> Time</th><th><i class="fas fa-paw"></i> Pet</th><th><i class="fas fa-user"></i> Owner</th><th><i class="fas fa-ticket-alt"></i> Token</th><th><i class="fas fa-flag-checkered"></i> Status</th></tr></thead><tbody>${allAppointments.map(a => `<tr><td>${a.date}侧<td>${a.time}侧<td><i class="fas fa-paw"></i> ${escapeHtml(a.petName)}侧<td><i class="fas fa-user"></i> ${escapeHtml(a.ownerName)}侧<td>${a.token}侧<td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span>侧)`).join('')}</tbody></table></body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><title>All Appointments</title><style>table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px}th{background:#f97316;color:white}</style></head><body><h2><i class="fas fa-clinic-medical"></i> VET FOR PET CLINIC - All Appointments</h2><p>Generated: ${getBangladeshFormattedTime()} on ${getBangladeshDate()}</p><table><thead><tr><th>Date</th><th>Time</th><th>Pet</th><th>Owner</th><th>Token</th><th>Status</th></tr></thead><tbody>${allAppointments.map(a => `<tr><td>${a.date}</td><td>${a.time}</td><td>${escapeHtml(a.petName)}</td><td>${escapeHtml(a.ownerName)}</td><td>${a.token}</td><td><span class="status ${a.status === 'Completed' ? 'completed' : 'confirmed'}">${a.status || 'Confirmed'}</span></td></tr>`).join('')}</tbody></table></body></html>`);
   win.document.close(); 
   win.print();
   showToast('🖨️ All appointments sent to printer', 'success');
 }
 
 // ============================================
-// SECTION 20: LOGOUT FUNCTIONS
+// SECTION 22: LOGOUT FUNCTIONS
 // ============================================
 
-/**
- * Show logout confirmation modal
- */
 function showLogoutModal() { 
   const modal = document.getElementById('logoutModal'); 
   if (modal) { 
@@ -1591,9 +1591,6 @@ function showLogoutModal() {
   } 
 }
 
-/**
- * Close logout confirmation modal
- */
 function closeLogoutModal() { 
   const modal = document.getElementById('logoutModal'); 
   if (modal) { 
@@ -1602,9 +1599,6 @@ function closeLogoutModal() {
   } 
 }
 
-/**
- * Confirm logout and redirect to login page
- */
 function confirmLogout() { 
   if (autoSyncInterval) clearInterval(autoSyncInterval); 
   sessionStorage.clear(); 
@@ -1612,17 +1606,33 @@ function confirmLogout() {
 }
 
 // ============================================
-// SECTION 21: UTILITY FUNCTIONS
+// SECTION 23: UTILITY FUNCTIONS
 // ============================================
 
-/**
- * Escape HTML to prevent XSS attacks
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
 function escapeHtml(text) { 
   if (!text) return ''; 
   const div = document.createElement('div'); 
   div.textContent = text; 
   return div.innerHTML; 
+}
+
+function showToast(message, type) {
+  const toastId = type === 'success' ? 'successToast' : (type === 'error' ? 'errorToast' : 'infoToast');
+  let toast = document.getElementById(toastId);
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast-notification ' + (type === 'success' ? 'success' : (type === 'error' ? 'error' : 'info'));
+    document.body.appendChild(toast);
+  }
+  const msgSpan = toast.querySelector('span');
+  if (msgSpan) {
+    msgSpan.innerText = message;
+  } else {
+    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : (type === 'error' ? 'exclamation-circle' : 'info-circle')}"></i> <span>${message}</span>`;
+  }
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
 }

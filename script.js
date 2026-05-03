@@ -9,7 +9,7 @@
 // ============================================
 
 // Google Apps Script URL for backend API
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyL1X_hZMifdg1DKPT4lcGKIig022HceElgtrvV63VLM6gUxhiK7YbuT1l3j-9YM8a6Ng/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxFwjqxDdC7uWqjF0CGbzYCHyZ1jZM_jsXz7P1FnNIANsAPpccZfvktQrFLrag3N1P/exec";
 
 // Default Slot Configuration (30-min intervals per day)
 // This will be overridden by localStorage if admin changes it
@@ -31,6 +31,7 @@ let bookedCache = {};        // Cache for booked appointments
 let currentDate = null;      // Currently selected date
 let selectedTime = null;     // Currently selected time slot
 let datePicker = null;       // Flatpickr instance
+let serialCounter = 1;       // Serial number counter
 
 // DOM element cache for performance
 const domCache = {};
@@ -69,6 +70,36 @@ function loadSlotConfig() {
     slotConfig = { ...DEFAULT_SLOT_CONFIG };
     console.log('📋 Using default slot configuration');
   }
+}
+
+/**
+ * Load serial counter from localStorage
+ */
+function loadSerialCounter() {
+  const savedSerial = localStorage.getItem('appointment_serial');
+  if (savedSerial) {
+    serialCounter = parseInt(savedSerial) + 1;
+  } else {
+    serialCounter = 1;
+  }
+}
+
+/**
+ * Save serial counter to localStorage
+ */
+function saveSerialCounter() {
+  localStorage.setItem('appointment_serial', serialCounter);
+}
+
+/**
+ * Generate unique serial number for appointment
+ * @returns {number} Unique serial number
+ */
+function generateSerialNumber() {
+  const serial = serialCounter;
+  serialCounter++;
+  saveSerialCounter();
+  return serial;
 }
 
 /**
@@ -112,6 +143,9 @@ function generateTimeSlots(dayName) {
 document.addEventListener('DOMContentLoaded', function() {
   // Load slot configuration first
   loadSlotConfig();
+  
+  // Load serial counter
+  loadSerialCounter();
   
   // Initialize AOS animations (with lazy load for mobile)
   if (typeof AOS !== 'undefined') {
@@ -258,16 +292,16 @@ async function fetchBookings(force = false) {
 /**
  * Save booking to Google Sheets and local cache
  * @param {Object} bookingData - Booking information
- * @param {string} token - Generated token for the booking
+ * @param {number} serialNumber - Generated serial number for the booking
  * @returns {Promise<boolean>} Success status
  */
-async function saveBookingToSheet(bookingData, token) {
+async function saveBookingToSheet(bookingData, serialNumber) {
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'addBooking', ...bookingData, token })
+      body: JSON.stringify({ action: 'addBooking', ...bookingData, serialNumber })
     });
     
     // Update local cache
@@ -395,16 +429,6 @@ function showMessage(msg, type) {
 }
 
 /**
- * Generate unique token for appointment
- * @returns {string} Unique token (e.g., "VFP20241201123456")
- */
-function generateToken() {
-  const timestamp = Date.now().toString().slice(-8);
-  const random = Math.floor(Math.random() * 1000);
-  return `VFP${timestamp}${random}`;
-}
-
-/**
  * Handle booking form submission
  * @param {Event} e - Form submit event
  */
@@ -438,8 +462,8 @@ async function handleBookingSubmit(e) {
     return;
   }
   
-  // Generate token and save booking
-  const token = generateToken();
+  // Generate serial number and save booking
+  const serialNumber = generateSerialNumber();
   const bookingData = { 
     petName, 
     petAge, 
@@ -458,7 +482,7 @@ async function handleBookingSubmit(e) {
   submitBtn.disabled = true;
   
   try {
-    await saveBookingToSheet(bookingData, token);
+    await saveBookingToSheet(bookingData, serialNumber);
     
     const formattedDate = new Date(currentDate).toLocaleDateString('en-US', { 
       weekday: 'long', 
@@ -483,8 +507,12 @@ async function handleBookingSubmit(e) {
       `;
     }
     
-    const popupToken = getElement('popupToken');
-    if (popupToken) popupToken.innerHTML = `<strong>🎫 TOKEN:</strong> ${token}`;
+    // Update popup with serial number (🔢 SERIAL NO instead of TOKEN)
+    const popupSerial = getElement('popupSerial');
+    if (popupSerial) {
+      popupSerial.innerHTML = `<strong>🔢 SERIAL NO:</strong> ${serialNumber}`;
+      popupSerial.style.display = 'block';
+    }
     
     const successPopup = getElement('successPopup');
     if (successPopup) successPopup.classList.add('active');
@@ -643,6 +671,132 @@ if (typeof window !== 'undefined') {
     checkAvailableSlots,
     getSlotConfig: () => slotConfig,
     getBookedCache: () => bookedCache,
-    forceRefresh: () => fetchBookings(true)
+    forceRefresh: () => fetchBookings(true),
+    resetSerialCounter: () => { serialCounter = 1; saveSerialCounter(); }
   };
+}
+
+
+// ============================================
+// SECTION 10: SERIAL NUMBER DISPLAY FIX
+// ============================================
+
+// Updated handleBookingSubmit function with proper serial number display
+// Replace your existing handleBookingSubmit function with this:
+
+async function handleBookingSubmit(e) {
+  e.preventDefault();
+  
+  // Get form values
+  const petName = getElement('petName')?.value.trim();
+  const petAge = getElement('petAge')?.value.trim() || 'N/A';
+  const petWeight = getElement('petWeight')?.value.trim() || 'N/A';
+  const ownerName = getElement('ownerName')?.value.trim();
+  const phone = getElement('phone')?.value.trim();
+  const symptoms = getElement('symptoms')?.value.trim();
+  
+  // Validation
+  if (!petName || !ownerName || !phone || !symptoms) {
+    showMessage('Please fill all required fields', 'error');
+    return;
+  }
+  
+  if (!currentDate || !selectedTime) {
+    showMessage('Please select a date and time slot', 'error');
+    return;
+  }
+  
+  // Check if slot is still available
+  await fetchBookings(true);
+  if (bookedCache[currentDate]?.includes(selectedTime)) {
+    showMessage('This slot was just booked! Please select another time.', 'error');
+    if (datePicker) datePicker.setDate(currentDate);
+    return;
+  }
+  
+  // Generate serial number
+  const serialNumber = generateSerialNumber();
+  const bookingData = { 
+    petName, 
+    petAge, 
+    petWeight, 
+    ownerName, 
+    phone, 
+    symptoms, 
+    date: currentDate, 
+    timeSlot: selectedTime, 
+    timestamp: new Date().toISOString() 
+  };
+  
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+  submitBtn.disabled = true;
+  
+  try {
+    await saveBookingToSheet(bookingData, serialNumber);
+    
+    const formattedDate = new Date(currentDate).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    // Update popup with booking details
+    const popupDetails = getElement('popupDetails');
+    if (popupDetails) {
+      popupDetails.innerHTML = `
+        <div style="text-align:left; margin-top:16px;">
+          <p><strong>🐾 Pet:</strong> ${escapeHtml(petName)}</p>
+          <p><strong>👤 Owner:</strong> ${escapeHtml(ownerName)}</p>
+          <p><strong>📞 Phone:</strong> ${escapeHtml(phone)}</p>
+          <p><strong>📅 Date:</strong> ${formattedDate}</p>
+          <p><strong>⏰ Time:</strong> ${selectedTime}</p>
+          <p><strong>📝 Symptoms:</strong> ${escapeHtml(symptoms)}</p>
+          <p><strong>👨‍⚕️ Doctor:</strong> Dr. Mitesh Tripura</p>
+        </div>
+      `;
+    }
+    
+    // Update popup with serial number
+    const popupSerial = getElement('popupSerial');
+    if (popupSerial) {
+      popupSerial.innerHTML = `<strong>🔢 SERIAL NO:</strong> ${serialNumber}`;
+      popupSerial.style.display = 'block';
+    }
+    
+    // Show success popup
+    const successPopup = getElement('successPopup');
+    if (successPopup) successPopup.classList.add('active');
+    
+    // Reset form
+    const bookingForm = getElement('bookingForm');
+    if (bookingForm) bookingForm.reset();
+    selectedTime = null;
+    currentDate = null;
+    if (datePicker) datePicker.clear();
+    
+    // Reset time slots container
+    const timeSlotsContainer = getElement('timeSlotsContainer');
+    if (timeSlotsContainer) {
+      timeSlotsContainer.innerHTML = '<div class="time-slots-empty"><i class="fas fa-calendar-alt"></i> Select a date to see available time slots</div>';
+    }
+    
+    const selectedSlotInput = getElement('selectedSlot');
+    if (selectedSlotInput) selectedSlotInput.value = '';
+    
+    // Refresh bookings cache
+    await fetchBookings(true);
+    
+    // Trigger notification for doctor portal
+    localStorage.setItem('doctor_notification_trigger', Date.now().toString());
+    
+  } catch (error) {
+    console.error('❌ Booking error:', error);
+    showMessage('Network error. Please try again.', 'error');
+  } finally {
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
+  }
 }

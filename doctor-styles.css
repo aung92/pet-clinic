@@ -547,10 +547,147 @@ body {
 }
 
 /* ============================================
-   SECTION 12: SEARCH PATIENT SECTION (FIXED)
+   SECTION 11.5: DATE SELECTOR & REFRESH BUTTON (ADDED)
    ============================================ */
 
-/* Search Box Styles */
+/* ADDED: Date Selector Container */
+.date-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ADDED: Date Input Field */
+.date-input {
+  padding: 10px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-family: 'Inter', sans-serif;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+}
+
+.date-input:hover {
+  border-color: var(--primary);
+}
+
+/* ADDED: Refresh Button */
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--gray-100);
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  color: var(--gray-700);
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-refresh i {
+  font-size: 0.9rem;
+  transition: transform 0.3s ease;
+}
+
+.btn-refresh:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-refresh:hover i {
+  transform: rotate(180deg);
+}
+
+.btn-refresh:active {
+  transform: translateY(0);
+}
+
+/* ADDED: Print Button */
+.btn-print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--gray-700);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-print:hover {
+  background: var(--gray-800);
+  transform: translateY(-2px);
+}
+
+.btn-print:active {
+  transform: translateY(0);
+}
+
+/* ADDED: Button Group in Date Selector */
+.date-selector .btn-refresh,
+.date-selector .btn-print {
+  padding: 10px 18px;
+}
+
+/* ADDED: Responsive Date Selector */
+@media (max-width: 640px) {
+  .date-selector {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .date-input {
+    flex: 1;
+    min-width: 140px;
+  }
+  
+  .date-selector .btn-refresh,
+  .date-selector .btn-print {
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .date-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .date-input {
+    width: 100%;
+  }
+  
+  .date-selector .btn-refresh,
+  .date-selector .btn-print {
+    justify-content: center;
+  }
+}
+
+/* ============================================
+   SECTION 12: SEARCH PATIENT SECTION (FIXED & ENHANCED)
+   ============================================ */
+
+/* Search Box Container */
 .search-box {
   display: flex;
   gap: 12px;
@@ -559,11 +696,26 @@ body {
   padding: 20px;
   border-radius: 24px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  flex-wrap: wrap;
 }
 
-.search-box input {
+/* Search Input Wrapper with Icon */
+.search-input-wrapper {
   flex: 1;
-  padding: 14px 20px;
+  position: relative;
+}
+
+.search-input-wrapper i {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  padding: 14px 16px 14px 45px;
   border: 2px solid var(--gray-200);
   border-radius: 50px;
   font-size: 1rem;
@@ -571,14 +723,15 @@ body {
   transition: all 0.3s;
 }
 
-.search-box input:focus {
+.search-input-wrapper input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
 }
 
+/* Search Buttons */
 .search-box button {
-  padding: 14px 32px;
+  padding: 14px 24px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
   border: none;
@@ -594,6 +747,17 @@ body {
 .search-box button:hover {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(249,115,22,0.3);
+}
+
+.search-box .btn-clear {
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.search-box .btn-clear:hover {
+  background: var(--gray-300);
+  transform: translateY(-2px);
+  box-shadow: none;
 }
 
 /* Search Loading State */
@@ -641,7 +805,7 @@ body {
   color: var(--gray-700);
 }
 
-/* Empty State for Search */
+/* Empty State */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -1615,4 +1779,262 @@ textarea:focus {
 
 .mb-4 {
   margin-bottom: 24px;
+}
+
+/* ============================================
+   SECTION 30: WELCOME POPUP NOTIFICATION
+   ============================================ */
+
+/* Welcome Popup Overlay */
+.welcome-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.welcome-popup.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Welcome Popup Content */
+.welcome-popup-content {
+  background: white;
+  border-radius: 28px;
+  width: 90%;
+  max-width: 450px;
+  overflow: hidden;
+  animation: popupSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes popupSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Popup Header */
+.popup-header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.popup-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+}
+
+.popup-close {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* Popup Body */
+.popup-body {
+  padding: 24px;
+  text-align: center;
+}
+
+.popup-body h3 {
+  font-size: 1.3rem;
+  color: var(--gray-900);
+  margin-bottom: 20px;
+}
+
+/* Popup Statistics Grid */
+.popup-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.popup-stat {
+  background: var(--gray-100);
+  padding: 12px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--gray-700);
+  margin-top: 4px;
+}
+
+/* Popup Message */
+.popup-message {
+  background: #fef3c7;
+  padding: 12px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: #d97706;
+}
+
+/* Popup Footer */
+.popup-footer {
+  padding: 16px 24px;
+  background: var(--gray-100);
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: center;
+}
+
+.popup-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.popup-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   NEW APPOINTMENT LIST STYLES
+   ============================================ */
+
+.popup-new-list {
+  max-height: 250px;
+  overflow-y: auto;
+  margin: 16px 0;
+  background: var(--gray-100);
+  border-radius: 16px;
+  padding: 8px;
+}
+
+.new-appointment-header {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--gray-700);
+  padding: 8px;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.new-appointment-item {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid var(--primary);
+  text-align: left;
+}
+
+.new-appointment-item:hover {
+  transform: translateX(5px);
+  box-shadow: var(--shadow-sm);
+}
+
+.new-appointment-pet {
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.new-appointment-details {
+  font-size: 0.7rem;
+  color: var(--gray-700);
+}
+
+.new-appointment-more {
+  text-align: center;
+  padding: 10px;
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.popup-btn-secondary {
+  background: var(--gray-200);
+  color: var(--gray-700);
+  border: none;
+  padding: 10px 24px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.popup-btn-secondary:hover {
+  background: var(--gray-300);
+}
+
+/* New Appointment Badge on Cards */
+.appointment-card.new-appointment,
+.history-item.new-appointment {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(90deg, rgba(239,68,68,0.05), white);
+  position: relative;
+}
+
+.appointment-card.new-appointment::before,
+.history-item.new-appointment::before {
+  content: "NEW";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.6rem;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
 }
